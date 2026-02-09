@@ -625,25 +625,30 @@ PHP;
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
     {
         return <<<BLADE
-    <div class="card">
+    {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
+    <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
+        @csrf
+        @method('DELETE')
+
+        <input type="hidden" name="ids" id="bulkIds" value="">
+
+        <div class="card">
         <div class="card-body d-flex justify-content-between align-items-center">
-        <div class="form-check">
+            <div class="form-check">
             <input class="form-check-input" type="checkbox" id="selectAll">
             <label class="form-check-label" for="selectAll">Select All</label>
-        </div>
-
-        <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="m-0">
-            @csrf
-            @method('DELETE')
-            <div id="bulkHiddenIds"></div>
+            </div>
 
             <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
             onclick="return confirm('Delete selected records?')">
             Delete Selected
             </button>
-        </form>
         </div>
+        </div>
+    </form>
 
+    {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
+    <div class="card">
         <div class="table-responsive">
         <table class="table table-striped table-hover mb-0 align-middle">
             <thead>
@@ -669,7 +674,8 @@ PHP;
                     <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
                     @csrf
                     @method('DELETE')
-                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')">Delete</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Delete?')">Delete</button>
                     </form>
                 </td>
                 </tr>
@@ -688,16 +694,20 @@ PHP;
         const selectAll = document.getElementById('selectAll');
         const checks = Array.from(document.querySelectorAll('.row-check'));
         const bulkBtn = document.getElementById('bulkDeleteBtn');
+        const bulkIds = document.getElementById('bulkIds');
         const bulkForm = document.getElementById('bulkDeleteForm');
-        const hiddenWrap = document.getElementById('bulkHiddenIds');
+
+        function selectedIds() {
+            return checks.filter(c => c.checked).map(c => c.value);
+        }
 
         function syncState() {
-            const anyChecked = checks.some(c => c.checked);
-            bulkBtn.disabled = !anyChecked;
+            const ids = selectedIds();
+            bulkBtn.disabled = ids.length === 0;
 
-            const allChecked = checks.length > 0 && checks.every(c => c.checked);
+            const allChecked = checks.length > 0 && ids.length === checks.length;
             selectAll.checked = allChecked;
-            selectAll.indeterminate = anyChecked && !allChecked;
+            selectAll.indeterminate = ids.length > 0 && !allChecked;
         }
 
         if (selectAll) {
@@ -708,21 +718,14 @@ PHP;
         }
 
         checks.forEach(c => c.addEventListener('change', syncState));
-        syncState();
 
         if (bulkForm) {
-            bulkForm.addEventListener('submit', function (e) {
-            // rebuild hidden ids[] inputs
-            hiddenWrap.innerHTML = '';
-            checks.filter(c => c.checked).forEach(c => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'ids[]';
-                input.value = c.value;
-                hiddenWrap.appendChild(input);
-            });
+            bulkForm.addEventListener('submit', function () {
+            bulkIds.value = selectedIds().join(',');
             });
         }
+
+        syncState();
         })();
     </script>
     BLADE;

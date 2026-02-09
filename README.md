@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 --- -->
 
-## [0.1.1] - Initial Release
+## [0.1.5] - Initial Release
 
 ### Added
 - Single Artisan command `crud:make` for CRUD generation
@@ -252,6 +252,17 @@ CRUD Pack uses **one shared delete-handling trait** across the entire applicatio
 ```bash
 app/Http/Controllers/Concerns/HandlesDeletes.php
 ```
+
+### To create (if not existing)/Replace (if existing) the HandlesDeletes.php trait with prompting [for any updates made from the package, and if you want to recreate the file to pull the updated logic]
+```bash
+php artisan crud:trait
+```
+
+### To overwrite existing HandlesDeletes.php trait without prompting
+```bash
+php artisan crud:trait --force
+```
+
 ### Behavior
 - The trait is generated **once per Laravel application**
 - On the first CRUD generation, the trait is created

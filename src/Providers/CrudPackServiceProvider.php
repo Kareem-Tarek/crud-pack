@@ -5,6 +5,7 @@ namespace KareemTarek\CrudPack\Providers;
 use Illuminate\Support\ServiceProvider;
 use KareemTarek\CrudPack\Commands\CrudMakeCommand;
 use KareemTarek\CrudPack\Commands\CrudPackInstallCommand;
+use KareemTarek\CrudPack\Commands\CrudPackTraitCommand;
 
 class CrudPackServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,7 @@ class CrudPackServiceProvider extends ServiceProvider
         $this->commands([
             CrudMakeCommand::class,
             CrudPackInstallCommand::class,
+            CrudPackTraitCommand::class
         ]);
 
         // ✅ Allow vendor:publish for the package views
