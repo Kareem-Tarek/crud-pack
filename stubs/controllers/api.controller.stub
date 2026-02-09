@@ -2,48 +2,52 @@
 
 namespace App\Http\Controllers\Api;
 
-{{REQUEST_IMPORT}}use App\Models\{{MODEL_CLASS}};
+{{REQUEST_IMPORT}}
+{{AUTH_IMPORT}}
+use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\HandlesDeletes;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
-    use HandlesDeletes;
+    {{CLASS_TRAITS}}
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
+{{CONSTRUCTOR}}
     public function index()
     {
-        ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
-        return response()->json(${{MODEL_VAR_PLURAL}});
+{{AUTH_INDEX}}
+        return response()->json(
+            {{MODEL_CLASS}}::query()->paginate(15)
+        );
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)
     {
+{{AUTH_STORE}}
         $item = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+
         return response()->json($item, 201);
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_SHOW}}
         return response()->json(${{MODEL_VAR}});
     }
 
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_UPDATE}}
         ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+
         return response()->json(${{MODEL_VAR}});
     }
 
     public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_DESTROY}}
         return $this->performDestroy(${{MODEL_VAR}});
     }
-
-    public function destroyBulk(\Illuminate\Http\Request $request)
-    {
-        return $this->performDestroyBulk($request);
-    }
-
-{{SOFT_CONTROLLER_METHODS_API}}
 }

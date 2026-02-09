@@ -2,61 +2,72 @@
 
 namespace App\Http\Controllers;
 
-{{REQUEST_IMPORT}}use App\Models\{{MODEL_CLASS}};
+{{REQUEST_IMPORT}}
+{{AUTH_IMPORT}}
+use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Concerns\HandlesDeletes;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
-    use HandlesDeletes;
+    {{CLASS_TRAITS}}
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
-    // Used by HandlesDeletes::performDeleted() to resolve the deleted view.
+    // Used by HandlesDeletes::deleted()
     protected string $viewFolder = '{{VIEW_FOLDER}}';
 
+{{CONSTRUCTOR}}
     public function index()
     {
+{{AUTH_INDEX}}
         ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
+
         return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}'));
     }
 
     public function create()
     {
+{{AUTH_CREATE}}
         ${{MODEL_VAR}} = new {{MODEL_CLASS}}();
+
         return view('{{VIEW_FOLDER}}.create', compact('{{MODEL_VAR}}'));
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)
     {
+{{AUTH_STORE}}
         {{MODEL_CLASS}}::create({{REQUEST_DATA}});
-        return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} created successfully.');
+
+        return redirect()
+            ->route('{{ROUTE_NAME}}.index')
+            ->with('success', '{{MODEL_CLASS}} created successfully.');
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_SHOW}}
         return view('{{VIEW_FOLDER}}.show', compact('{{MODEL_VAR}}'));
     }
 
     public function edit({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_EDIT}}
         return view('{{VIEW_FOLDER}}.edit', compact('{{MODEL_VAR}}'));
     }
 
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_UPDATE}}
         ${{MODEL_VAR}}->update({{REQUEST_DATA}});
-        return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} updated successfully.');
+
+        return redirect()
+            ->route('{{ROUTE_NAME}}.index')
+            ->with('success', '{{MODEL_CLASS}} updated successfully.');
     }
 
     public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
+{{AUTH_DESTROY}}
         return $this->performDestroy(${{MODEL_VAR}});
     }
-
-    public function destroyBulk(\Illuminate\Http\Request $request)
-    {
-        return $this->performDestroyBulk($request);
-    }
-
-{{SOFT_CONTROLLER_METHODS_WEB}}
 }
