@@ -95,14 +95,14 @@ The resource name is the foundation of everything CRUD Pack generates and must s
 - Must be StudlyCase
 - Must NOT include suffixes like Controller, Model, Request, etc.
 
-### Valid Examples
+### Valid Examples ✅
 ```bash
 php artisan crud:make Category
 php artisan crud:make Product
 php artisan crud:make ProductCategory
 
 ```
-### Invalid Examples
+### Invalid Examples ❌
 ```bash
 php artisan crud:make categories
 php artisan crud:make category
@@ -110,8 +110,8 @@ php artisan crud:make product_categories
 
 ```
 From this single resource name, CRUD Pack dynamically derives:
-| Item              | Result                                                  |
-|-------------------|---------------------------------------------------------|
+| Item              | Result                                              |
+|-------------------|-----------------------------------------------------|
 | Model             | ``` App\Models\Category ```                         |
 | Table             | ``` categories ```                                  |
 | Controller (Web)  | ``` App\Http\Controllers\CategoryController ```     |
@@ -120,4 +120,29 @@ From this single resource name, CRUD Pack dynamically derives:
 | Route names       | ``` categories.* ```                                |
 | Variables         | ``` $category, $categories ```                      |
 | Views folder      | ``` resources/views/categories ```                  |
+---
+## Mandatory Decisions (Always Required)
+Every execution of the command requires **two mandatory decisions**.
+These are **never optional** and must be resolved before generation proceeds.
 
+### 1) Controller Type
+
+Choose exactly one:
+- --web → Web controller (Blade views, redirects, sessions)
+- --api → API controller (JSON responses only)
+
+### 2) Soft Delete Mode
+
+Choose exactly one:
+- --soft-deletes
+- --no-soft-deletes
+
+These decisions can be passed as flags or selected interactively.
+
+### Example
+```bash
+php artisan crud:make Category --web --soft-deletes
+```
+If either decision is missing, CRUD Pack will prompt the developer to choose.
+
+---
