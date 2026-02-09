@@ -1,4 +1,43 @@
-# CRUD Pack
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+---
+
+## [0.1.0] - Initial Release
+
+### Added
+- Single Artisan command `crud:make` for CRUD generation
+- Support for Web and API controllers
+- Mandatory controller type and soft-delete mode selection
+- Optional generators:
+  - Routes
+  - Eloquent model
+  - Migration
+  - Form request (store + update)
+  - Policy
+  - Blade views (Web only)
+- Shared delete-handling trait generated once per application
+- Soft delete workflows:
+  - Deleted listing
+  - Restore (single & bulk)
+  - Force delete (single & bulk)
+- Bulk delete support
+- Blueprint-first design (no hidden logic, no magic)
+- Bootstrap 5–based Blade views
+- Interactive wizard mode
+- Full Laravel naming convention compliance
+- Compatibility with PHP 8.0+ and Laravel 8.0+
+
+### Notes
+- This is the first stable release.
+- All generated code is intended to be edited and customized by developers.
+---
+# ⬇️ Lets get started ⬇️
+# CRUD Pack (kareemtarek/crud-pack)
 
 CRUD Pack is a **blueprint-first Laravel CRUD generator** that allows developers to scaffold complete CRUD resources (Web or API) using a single Artisan command, while strictly following Laravel conventions.
 
@@ -42,9 +81,9 @@ The goal is **speed without sacrificing control**.
 ## Requirements
 
 - **PHP:** 8.0 or higher
-- **Laravel:** 8.x and above  
-  - Developed and tested on **Laravel 11 and Laravel 12**
-  - Fully compatible with Laravel 8+
+- **Laravel:** 8.0 or higher 
+  - Developed and tested on **Laravel 12**
+  - Fully compatible with Laravel 8.0+
 
 ---
 
@@ -54,7 +93,7 @@ The goal is **speed without sacrificing control**.
 composer require kareemtarek/crud-pack
 ```
 
-## Lets jump into the package instructions ⤵︎
+## Lets jump into the package instructions ⤵️
 
 ## Core Concept
 CRUD Pack is centered around one single Artisan command and one resource name.
@@ -219,4 +258,129 @@ This ensures:
 - No duplicated delete logic
 - One consistent delete blueprint
 - Reusable behavior across all controllers
+---
+## Delete & Soft-Delete Endpoints (Trait Methods)
+All delete-related endpoints live **directly inside the trait**, not in controllers.
+
+### Methods Provided
+``` destroy ``` — single record delete (resource method)
+``` destroyBulk ``` — bulk delete
+``` deleted ``` — list soft-deleted records
+``` restore ``` — restore single record
+``` restoreBulk ``` — restore multiple records
+``` forceDelete ``` — permanently delete single record
+``` forceDeleteBulk ``` — permanently delete multiple records
+
+### Important Rules
+- destroy is **always active**
+- The other six methods are soft-delete related
+- The trait always contains real logic
+- Methods are enabled/disabled via **routes**, not by modifying the trait
+- Responses automatically adapt:
+    - JSON for API
+    - Redirects + flash messages for Web
+---
+## Soft Delete Behavior (Blueprint-First Design)
+When route generation is enabled:
+### If ``` --soft-deletes ``` is selected
+- All soft-delete routes are generated active
+- Deleted listing, restore, force delete, and bulk operations work immediately
+
+### If ``` --no-soft-deletes ``` is selected
+- Soft-delete routes are still generated
+- They are commented out
+- This provides a visible blueprint developers can enable later
+
+Nothing is hidden. Nothing is removed.
+
+---
+## Routes Generation
+If route generation is enabled:
+### Main CRUD Route (Single Line)
+#### Web
+```bash
+Route::resource('categories', CategoryController::class);
+```
+#### API
+```bash
+Route::apiResource('categories', Api\CategoryController::class);
+```
+This covers all standard CRUD actions, including single-record destroy.
+### Additional Delete Routes
+Generated explicitly:
+- destroyBulk (destroy/delete multiple resource at once)
+- deleted (the blade/page that has the deleted resources by the soft-delete)
+- restore (restore action for a single soft-deleted resource)
+- restoreBulk (restore action for a multiple soft-deleted resources)
+- forceDelete (permanent destroy/delete action for a single soft-deleted resource)
+- forceDeleteBulk (permanent destroy/delete action for a multiple soft-deleted resources)
+
+These routes are:
+- Appended to the correct routes file (web or api, based on the option entered in the CLI)
+- Wrapped with clear start/end markers (Comments)
+- Enabled or commented based on soft-delete choice (dynamic to the selected soft-delete option in the CLI)
+
+---
+## Blade Views (Web Controllers Only)
+When views are enabled, CRUD Pack generates **Bootstrap 5–based Blade templates**:
+- index (listing + bulk actions)
+- create
+- edit
+- show
+- ``` _form ``` (shared with create & edit blades)
+- deleted (soft-deleted records)
+
+### View Features
+- Checkbox selection + select-all
+- Single & bulk actions (delete actions)
+- Confirmation prompts
+- Validation error display
+- Proper old() handling
+- Clean, minimal, production-ready layout
+---
+## Request Validation
+If request generation is enabled:
+- A single FormRequest is generated
+- Used for both ``` store ``` and ``` update ```
+- Handles unique validation correctly with ignore logic
+---
+## Policies
+If policy generation is enabled:
+- A policy is generated following Laravel conventions
+- Authorization is wired into the controller constructor
+
+If no policy is generated:
+-The controller constructor remains empty
+-No authorization logic is injected
+
+---
+## Example Commands
+### Web CRUD with everything
+```bash
+php artisan crud:make Category --web --soft-deletes --all
+```
+
+### API CRUD with everything
+```bash
+php artisan crud:make Product --api --no-soft-deletes --all
+```
+
+### Interactive wizard
+```bash
+php artisan crud:make Department
+```
+---
+## Philosophy & Customization
+CRUD Pack exists to:
+- Remove repetitive CRUD boilerplate
+- Provide a professional, realistic starting point
+- Preserve full developer control
+
+All generated code is:
+- Readable
+- Editable
+- Replaceable
+
+You are never locked in.
+
 ---
