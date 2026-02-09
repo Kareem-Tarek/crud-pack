@@ -13,17 +13,29 @@ class {{MODEL_CLASS}}Controller extends Controller
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
+    // Not typically used for API, but kept for trait compatibility
+    protected string $viewFolder = '{{VIEW_FOLDER}}';
+    protected string $modelVarPlural = '{{MODEL_VAR_PLURAL}}';
+
 {{CONSTRUCTOR}}
 
     public function index()
     {
-        return {{MODEL_CLASS}}::query()->paginate(15);
+        ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
+
+        return response()->json(${{MODEL_VAR_PLURAL}});
     }
 
-    public function store({{REQUEST_TYPEHINT}} $request)
+    public function store({{REQUEST_CLASS}} $request)
     {
-        $record = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
-        return response()->json($record, 201);
+        $data = {{REQUEST_DATA}};
+
+        ${{MODEL_VAR}} = {{MODEL_CLASS}}::create($data);
+
+        return response()->json([
+            'message' => '{{MODEL_CLASS}} created successfully.',
+            'data' => ${{MODEL_VAR}},
+        ], 201);
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
@@ -31,9 +43,24 @@ class {{MODEL_CLASS}}Controller extends Controller
         return response()->json(${{MODEL_VAR}});
     }
 
-    public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
+    public function update({{REQUEST_CLASS}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
-        ${{MODEL_VAR}}->update({{REQUEST_DATA}});
-        return response()->json(${{MODEL_VAR}});
+        $data = {{REQUEST_DATA}};
+
+        ${{MODEL_VAR}}->update($data);
+
+        return response()->json([
+            'message' => '{{MODEL_CLASS}} updated successfully.',
+            'data' => ${{MODEL_VAR}},
+        ]);
+    }
+
+    /**
+     * Single delete with model binding.
+     * Real logic is in the trait.
+     */
+    public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
+    {
+        return $this->performDestroy(${{MODEL_VAR}});
     }
 }

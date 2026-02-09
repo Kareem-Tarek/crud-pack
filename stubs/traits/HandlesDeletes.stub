@@ -3,24 +3,24 @@
 namespace App\Http\Controllers\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
 trait HandlesDeletes
 {
     /**
-     * Single delete (resource destroy).
-     * Works with Route::resource / Route::apiResource.
+     * Real single-delete logic (called by controller destroy() for model binding).
      */
-    public function destroy(Model $model)
+    protected function performDestroy(Model $model)
     {
         $model->delete();
 
-        return $this->deleteResponse('Deleted successfully.');
+        return $this->actionResponse('Deleted successfully.');
     }
 
     /**
-     * Bulk delete (explicit route) — enabled only when soft-deletes is chosen.
+     * Bulk delete (explicit route).
      */
     public function destroyBulk(Request $request)
     {
@@ -30,71 +30,110 @@ trait HandlesDeletes
             $this->modelClass::query()->whereKey($ids)->delete();
         }
 
-        return $this->deleteResponse('Selected records deleted.');
+        return $this->actionResponse('Selected records deleted.');
     }
 
     /**
-     * List soft-deleted records (explicit route) — enabled only when soft-deletes is chosen.
+     * List soft-deleted records (explicit route) — soft deletes only.
      */
     public function deleted()
     {
+        if ($resp = $this->requireSoftDeletes()) {
+            return $resp;
+        }
+
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
         if (request()->expectsJson()) {
             return response()->json($items);
         }
 
-        return view($this->viewFolder . '.deleted', compact('items'));
+        // Web: pass the plural variable dynamically (e.g. $products, $categories)
+        $var = $this->modelVarPlural ?? 'items';
+
+        return view($this->viewFolder . '.deleted', [
+            $var => $items,
+        ]);
     }
 
     /**
-     * Restore single (explicit route) — enabled only when soft-deletes is chosen.
+     * Restore single (explicit route) — soft deletes only.
      */
     public function restore(int|string $id)
     {
+        if ($resp = $this->requireSoftDeletes()) {
+            return $resp;
+        }
+
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->restore();
 
-        return $this->deleteResponse('Restored successfully.');
+        return $this->actionResponse('Restored successfully.');
     }
 
     /**
-     * Restore bulk (explicit route) — enabled only when soft-deletes is chosen.
+     * Restore bulk (explicit route) — soft deletes only.
      */
     public function restoreBulk(Request $request)
     {
+        if ($resp = $this->requireSoftDeletes()) {
+            return $resp;
+        }
+
         $ids = $this->extractIds($request);
 
         if (!empty($ids)) {
             $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
         }
 
-        return $this->deleteResponse('Selected records restored.');
+        return $this->actionResponse('Selected records restored.');
     }
 
     /**
-     * Force delete single (explicit route) — enabled only when soft-deletes is chosen.
+     * Force delete single (explicit route) — soft deletes only.
      */
     public function forceDelete(int|string $id)
     {
+        if ($resp = $this->requireSoftDeletes()) {
+            return $resp;
+        }
+
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->forceDelete();
 
-        return $this->deleteResponse('Permanently deleted.');
+        return $this->actionResponse('Permanently deleted.');
     }
 
     /**
-     * Force delete bulk (explicit route) — enabled only when soft-deletes is chosen.
+     * Force delete bulk (explicit route) — soft deletes only.
      */
     public function forceDeleteBulk(Request $request)
     {
+        if ($resp = $this->requireSoftDeletes()) {
+            return $resp;
+        }
+
         $ids = $this->extractIds($request);
 
         if (!empty($ids)) {
             $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
         }
 
-        return $this->deleteResponse('Selected records permanently deleted.');
+        return $this->actionResponse('Selected records permanently deleted.');
+    }
+
+    /**
+     * Ensure model uses SoftDeletes trait.
+     */
+    protected function requireSoftDeletes()
+    {
+        $uses = class_uses_recursive($this->modelClass) ?: [];
+
+        if (!in_array(SoftDeletes::class, $uses, true)) {
+            return $this->actionResponse('Soft deletes are not enabled for this resource.', 400, 'error');
+        }
+
+        return null;
     }
 
     protected function extractIds(Request $request): array
@@ -108,12 +147,17 @@ trait HandlesDeletes
         return Arr::wrap($ids);
     }
 
-    protected function deleteResponse(string $message)
+    /**
+     * Unified response:
+     * - JSON when expectsJson()
+     * - Redirect back with flash message for web
+     */
+    protected function actionResponse(string $message, int $status = 200, string $flashKey = 'success')
     {
         if (request()->expectsJson()) {
-            return response()->json(['message' => $message]);
+            return response()->json(['message' => $message], $status);
         }
 
-        return redirect()->back()->with('success', $message);
+        return redirect()->back()->with($flashKey, $message);
     }
 }

@@ -88,9 +88,15 @@ The goal is **speed without sacrificing control**.
 ---
 
 ## Installation
-
+After installing the package
 ```bash
 composer require kareemtarek/crud-pack
+php artisan crud:install (or php artisan crud:install --force)
+```
+
+To override without prompts:
+```bash
+php artisan crud:install --force
 ```
 
 ## Lets jump into the package instructions ⤵️

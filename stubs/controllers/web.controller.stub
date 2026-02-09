@@ -12,27 +12,37 @@ class {{MODEL_CLASS}}Controller extends Controller
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
-    // Used by HandlesDeletes::deleted() to resolve the deleted view.
+    // Used by HandlesDeletes::deleted() (web view)
     protected string $viewFolder = '{{VIEW_FOLDER}}';
+
+    // Used by HandlesDeletes::deleted() to pass variable name (e.g. $products)
+    protected string $modelVarPlural = '{{MODEL_VAR_PLURAL}}';
 
 {{CONSTRUCTOR}}
 
     public function index()
     {
         ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
+
         return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}'));
     }
 
     public function create()
     {
         ${{MODEL_VAR}} = new {{MODEL_CLASS}}();
+
         return view('{{VIEW_FOLDER}}.create', compact('{{MODEL_VAR}}'));
     }
 
-    public function store({{REQUEST_TYPEHINT}} $request)
+    public function store({{REQUEST_CLASS}} $request)
     {
-        {{MODEL_CLASS}}::create({{REQUEST_DATA}});
-        return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} created successfully.');
+        $data = {{REQUEST_DATA}};
+
+        {{MODEL_CLASS}}::create($data);
+
+        return redirect()
+            ->route('{{ROUTE_NAME}}.index')
+            ->with('success', '{{MODEL_CLASS}} created successfully.');
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
@@ -45,9 +55,23 @@ class {{MODEL_CLASS}}Controller extends Controller
         return view('{{VIEW_FOLDER}}.edit', compact('{{MODEL_VAR}}'));
     }
 
-    public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
+    public function update({{REQUEST_CLASS}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
-        ${{MODEL_VAR}}->update({{REQUEST_DATA}});
-        return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} updated successfully.');
+        $data = {{REQUEST_DATA}};
+
+        ${{MODEL_VAR}}->update($data);
+
+        return redirect()
+            ->route('{{ROUTE_NAME}}.index')
+            ->with('success', '{{MODEL_CLASS}} updated successfully.');
+    }
+
+    /**
+     * Single delete with model binding.
+     * Real logic is in the trait.
+     */
+    public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
+    {
+        return $this->performDestroy(${{MODEL_VAR}});
     }
 }

@@ -116,9 +116,20 @@ class CrudMakeCommand extends Command
         $modelVar = Str::camel($name);
         $modelVarPlural = Str::camel(Str::pluralStudly($name));
         $table = Str::snake(Str::pluralStudly($name));
+
+        // URI is kebab-case plural (best practice)
         $uri = Str::kebab(Str::pluralStudly($name));
+
+        // Views folder can be snake_case plural
         $viewFolder = Str::snake(Str::pluralStudly($name));
-        $routeName = Str::snake(Str::pluralStudly($name));
+
+        /**
+         * IMPORTANT:
+         * Route::resource() route names are derived from the URI by default.
+         * For multi-word resources, URI becomes "product-categories", so route names are "product-categories.index".
+         * Therefore, routeName must match URI to avoid route-name mismatches in generated code.
+         */
+        $routeName = $uri;
 
         $force = (bool) $this->option('force');
 
@@ -231,22 +242,19 @@ class CrudMakeCommand extends Command
                 ? "      <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a>\n"
                 : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a> --}}\n";
 
-            // Bulk delete block: active only if soft-deletes; else blueprint comment
-            $bulkBlockActive = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
-            $bulkBlockCommented = $this->bulkDeleteBlockCommented($routeName, $modelVarPlural);
-
-            $bulkBlock = $soft ? $bulkBlockActive : $bulkBlockCommented;
+            // Bulk delete/table block should always be generated (works with or without soft deletes)
+            $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
 
             // index
             $this->generateFromStub(
                 stub: $this->stubPath('views/index.stub'),
                 target: "{$viewsDir}/index.blade.php",
                 replacements: [
-                    '{{MODEL_CLASS}}'      => $modelClass,
-                    '{{MODEL_VAR_PLURAL}}' => $modelVarPlural,
-                    '{{ROUTE_NAME}}'       => $routeName,
-                    '{{DELETED_BUTTON}}'   => $deletedButton,
-                    '{{BULK_DELETE_BLOCK}}' => $bulkBlock,
+                    '{{MODEL_CLASS}}'        => $modelClass,
+                    '{{MODEL_VAR_PLURAL}}'   => $modelVarPlural,
+                    '{{ROUTE_NAME}}'         => $routeName,
+                    '{{DELETED_BUTTON}}'     => $deletedButton,
+                    '{{BULK_DELETE_BLOCK}}'  => $bulkBlock,
                 ],
                 force: $force
             );
@@ -318,7 +326,8 @@ class CrudMakeCommand extends Command
                 soft: $soft,
                 uri: $uri,
                 routeName: $routeName,
-                modelClass: $modelClass
+                modelClass: $modelClass,
+                force: $force
             );
         }
 
@@ -342,7 +351,7 @@ class CrudMakeCommand extends Command
             stub: $this->stubPath('traits/HandlesDeletes.stub'),
             target: $target,
             replacements: [],
-            force: true // if force, overwrite; else this method returns earlier
+            force: true
         );
     }
 
@@ -363,7 +372,8 @@ class CrudMakeCommand extends Command
     ): void {
         $stub = $isWeb ? 'controllers/web.controller.stub' : 'controllers/api.controller.stub';
 
-        $requestImport = '';
+        // If no FormRequest is generated, we MUST import Illuminate\Http\Request
+        $requestImport = "use Illuminate\\Http\\Request;\n";
         $requestTypehint = 'Request';
         $requestData = '$request->all()';
 
@@ -399,9 +409,13 @@ PHP;
                 '{{TABLE}}'             => $table,
                 '{{VIEW_FOLDER}}'       => $viewFolder,
                 '{{ROUTE_NAME}}'        => $routeName,
+
+                // Support both placeholder styles to avoid stub mismatch bugs:
                 '{{REQUEST_IMPORT}}'    => $requestImport,
                 '{{REQUEST_TYPEHINT}}'  => $requestTypehint,
+                '{{REQUEST_CLASS}}'     => $requestTypehint,
                 '{{REQUEST_DATA}}'      => $requestData,
+
                 '{{CONSTRUCTOR}}'       => $constructor,
             ],
             force: $force
@@ -411,56 +425,77 @@ PHP;
     /* ===========================
      | Routes Appending
      =========================== */
-    protected function appendRoutes(string $name, bool $isWeb, bool $soft, string $uri, string $routeName, string $modelClass): void
-    {
+    protected function appendRoutes(
+        string $name,
+        bool $isWeb,
+        bool $soft,
+        string $uri,
+        string $routeName,
+        string $modelClass,
+        bool $force
+    ): void {
         $routesPath = $isWeb ? base_path('routes/web.php') : base_path('routes/api.php');
 
         $controllerFqn = $isWeb
             ? "\\App\\Http\\Controllers\\{$modelClass}Controller::class"
             : "\\App\\Http\\Controllers\\Api\\{$modelClass}Controller::class";
 
+        // IMPORTANT: custom routes must be defined BEFORE resource routes to avoid conflicts
+        $lines = [];
+
+        // Always include bulk delete (works with and without soft deletes)
+        if ($isWeb) {
+            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('{$routeName}.destroyBulk');";
+        } else {
+            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk']);";
+        }
+
+        $lines[] = "";
+
+        // Soft-delete related routes: enabled only when soft-deletes is chosen
+        $softRoutes = [];
+
+        if ($isWeb) {
+            $softRoutes[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted'])->name('{$routeName}.deleted');";
+            $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('{$routeName}.restore');";
+            $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('{$routeName}.restoreBulk');";
+            $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
+            $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
+        } else {
+            $softRoutes[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted']);";
+            $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore']);";
+            $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk']);";
+            $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete']);";
+            $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk']);";
+        }
+
+        if ($soft) {
+            foreach ($softRoutes as $r) {
+                $lines[] = $r;
+            }
+        } else {
+            $lines[] = "// Soft Deletes disabled: uncomment the routes below after enabling SoftDeletes";
+            foreach ($softRoutes as $r) {
+                $lines[] = "// " . $r;
+            }
+        }
+
+        $lines[] = "";
+
+        // Main resource route LAST (prevents '/deleted' and '/bulk' from being captured as {id})
         $main = $isWeb
             ? "Route::resource('{$uri}', {$controllerFqn});"
             : "Route::apiResource('{$uri}', {$controllerFqn});";
 
-        $lines = [];
         $lines[] = $main;
-        $lines[] = "";
-
-        // All 6 extra endpoints are enabled only when soft-deletes is chosen.
-        // If no-soft-deletes: generate them but commented (blueprint).
-        $extra = [];
-
-        if ($isWeb) {
-            $extra[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('{$routeName}.destroyBulk');";
-            $extra[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted'])->name('{$routeName}.deleted');";
-            $extra[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('{$routeName}.restore');";
-            $extra[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('{$routeName}.restoreBulk');";
-            $extra[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
-            $extra[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
-        } else {
-            $extra[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk']);";
-            $extra[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted']);";
-            $extra[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore']);";
-            $extra[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk']);";
-            $extra[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete']);";
-            $extra[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk']);";
-        }
-
-        if ($soft) {
-            foreach ($extra as $l) $lines[] = $l;
-        } else {
-            $lines[] = "// Soft Deletes disabled: uncomment the routes below after enabling SoftDeletes";
-            foreach ($extra as $l) $lines[] = "// " . $l;
-        }
 
         $snippet = implode("\n", $lines);
-        $this->upsertRoutesBlock($routesPath, $name, $snippet);
+        $this->upsertRoutesBlock($routesPath, $name, $snippet, $force);
 
         $this->info("Routes updated in: " . ($isWeb ? 'routes/web.php' : 'routes/api.php'));
     }
 
-    protected function upsertRoutesBlock(string $routesPath, string $blockId, string $snippet): void
+    protected function upsertRoutesBlock(string $routesPath, string $blockId, string $snippet, bool $force): void
     {
         $start = "// CRUDPACK:{$blockId}:START";
         $end   = "// CRUDPACK:{$blockId}:END";
@@ -469,9 +504,18 @@ PHP;
 
         $contents = $this->files->exists($routesPath)
             ? $this->files->get($routesPath)
-            : "<?php\n\n";
+            : "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n\n";
 
-        if (str_contains($contents, $start) && str_contains($contents, $end)) {
+        $contents = $this->ensureRouteFacadeImported($contents);
+
+        $hasBlock = str_contains($contents, $start) && str_contains($contents, $end);
+
+        if ($hasBlock && !$force) {
+            $this->warn("Routes block already exists for [{$blockId}]. Use --force to overwrite it.");
+            return;
+        }
+
+        if ($hasBlock) {
             $pattern = '/' . preg_quote($start, '/') . '.*?' . preg_quote($end, '/') . '\s*/s';
             $contents = preg_replace($pattern, $block, $contents);
         } else {
@@ -479,6 +523,26 @@ PHP;
         }
 
         $this->files->put($routesPath, $contents);
+    }
+
+    protected function ensureRouteFacadeImported(string $contents): string
+    {
+        if (str_contains($contents, 'use Illuminate\\Support\\Facades\\Route;')) {
+            return $contents;
+        }
+
+        // Insert right after the opening php tag
+        if (preg_match('/^<\?php\s*/', $contents)) {
+            return preg_replace(
+                '/^<\?php\s*/',
+                "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n\n",
+                $contents,
+                1
+            );
+        }
+
+        // Fallback
+        return "use Illuminate\\Support\\Facades\\Route;\n\n" . $contents;
     }
 
     /* ===========================
@@ -603,18 +667,6 @@ PHP;
     })();
   </script>
 BLADE;
-    }
-
-    protected function bulkDeleteBlockCommented(string $routeName, string $modelVarPlural): string
-    {
-        $active = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
-        $lines = explode("\n", $active);
-        $out = [];
-        $out[] = "  {{-- Soft Deletes disabled: bulk delete endpoint is blueprint-commented in routes. Uncomment after enabling soft deletes. --}}";
-        foreach ($lines as $line) {
-            $out[] = "  {{-- " . rtrim($line) . " --}}";
-        }
-        return implode("\n", $out);
     }
 
     /* ===========================
