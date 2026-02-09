@@ -17,10 +17,14 @@ class {{MODEL_CLASS}}Controller extends Controller
 {{CONSTRUCTOR}}
     public function index()
     {
-{{AUTH_INDEX}}
-        return response()->json(
-            {{MODEL_CLASS}}::query()->paginate(15)
-        );
+        {{AUTH_INDEX}}
+
+        $data = {{MODEL_CLASS}}::query();
+
+        return response()->json([
+            'totalCount' => $data->count(), 
+            'data'       => $data->items()
+        ]);
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)

@@ -20,9 +20,10 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function index()
     {
 {{AUTH_INDEX}}
+        $totalCount = {{MODEL_CLASS}}::query()->count();
         ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
 
-        return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}'));
+        return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount'));
     }
 
     public function create()

@@ -193,17 +193,24 @@ If either decision is missing, CRUD Pack will prompt the developer to choose.
 ---
 ## Optional Generators
 In addition to the controller (which is always generated), CRUD Pack can optionally generate:
-| Option              | Description                                                       |
-|---------------------|-------------------------------------------------------------------|
-| ``` --routes ```    | Append routes to ``` routes/web.php ``` or ``` routes/api.php ``` |
-| ``` --model ```     | Generate an Eloquent model                                        |
-| ``` --migration ``` | Generate a migration                                              |
-| ``` --request ```   | Generate a single FormRequest (used for store & update)           |
-| ``` --policy ```    | Generate a policy and wire authorization                          |
-| ``` --views ```     | Generate Blade views (Web only)                                   |
+| Option                 | Description                                                       |
+|------------------------|-------------------------------------------------------------------|
+| ``` --routes ```       | Append routes to ``` routes/web.php ``` or ``` routes/api.php ``` |
+| ``` --model ```        | Generate an Eloquent model                                        |
+| ``` --migration ```    | Generate a migration                                              |
+| ``` --request ```      | Generate a single FormRequest (used for store & update)           |
+| ``` --policy-style ``` | Generate a policy and wire authorization                          |
+| ``` --views ```        | Generate Blade views (Web only)                                   |
+---
+CRUD Pack provides a convenience shortcut:
+
+## The --policy-style= Shortcut (default "authorize")
+- --policy-style=authorize (adds use AuthorizesRequests and $this->authorize(...)) [default]
+- --policy-style=gate (\Illuminate\Support\Facades\Gate::authorize(...))
+- --policy-style=resource (uses authorizeResource() but only if compatible)
+- --policy-style=none (no policy is used)
 ---
 ## The --all Shortcut
-CRUD Pack provides a convenience shortcut:
 ```bash
 php artisan crud:make Category --web --soft-deletes --all
 ```

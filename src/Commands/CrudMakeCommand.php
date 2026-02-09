@@ -773,13 +773,19 @@ PHP;
      */
     public function deleted()
     {
+        $trashedTotal = $this->modelClass::onlyTrashed()->count();
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
         if (request()->expectsJson()) {
-            return response()->json($items);
+            $items = $this->modelClass::onlyTrashed();
+
+            return response()->json([
+                'total' => $trashedTotal,
+                'data'  => $items,
+            ]);
         }
 
-        return view($this->viewFolder . '.deleted', compact('items'));
+        return view($this->viewFolder . '.deleted', compact('items', 'trashedTotal'));
     }
 
     /**
