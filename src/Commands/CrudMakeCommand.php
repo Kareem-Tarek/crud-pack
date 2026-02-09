@@ -199,9 +199,9 @@ class CrudMakeCommand extends Command
                 stub: $this->stubPath('models/model.stub'),
                 target: app_path("Models/{$modelClass}.php"),
                 replacements: [
-                    '{{MODEL_CLASS}}' => $modelClass,
-                    '{{SOFT_IMPORT}}' => $softImport,
-                    '{{SOFT_USE}}'    => $softUse,
+                    '{{MODEL_CLASS}}'       => $modelClass,
+                    '{{SOFT_MODEL_IMPORT}}' => $softImport,
+                    '{{SOFT_MODEL_USE}}'    => $softUse,
                 ],
                 force: $force,
                 askReplaceIfExists: true
@@ -576,7 +576,7 @@ PHP;
                 target: $target,
                 replacements: [
                     '{{TABLE}}'       => $table,
-                    '{{SOFT_COLUMN}}' => $softColumn,
+                    '{{SOFT_MIGRATION_COLUMN}}' => $softColumn,
                 ],
                 force: true,
                 askReplaceIfExists: false
