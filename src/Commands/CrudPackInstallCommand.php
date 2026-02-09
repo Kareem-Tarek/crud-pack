@@ -7,83 +7,62 @@ use Illuminate\Filesystem\Filesystem;
 
 class CrudPackInstallCommand extends Command
 {
-    protected $signature = 'crud-pack:install
-                            {--force : Overwrite existing files without prompting}';
+    protected $signature = 'crud:install
+        {--force : Overwrite existing files without prompting}';
 
-    protected $description = 'Install CRUD Pack Bootstrap layout views (layouts/app, layouts/navigation, welcome).';
+    protected $description = 'Install CRUD Pack Bootstrap layout views (app, navigation, welcome).';
 
-    public function handle(Filesystem $files): int
+    public function __construct(protected Filesystem $files)
     {
-        $targets = [
-            'layouts/app.blade.php' => resource_path('views/layouts/app.blade.php'),
-            'layouts/navigation.blade.php' => resource_path('views/layouts/navigation.blade.php'),
-            'welcome.blade.php' => resource_path('views/welcome.blade.php'),
-        ];
-
-        $existing = [];
-        $missing = [];
-
-        foreach ($targets as $label => $path) {
-            if ($files->exists($path)) {
-                $existing[$label] = $path;
-            } else {
-                $missing[$label] = $path;
-            }
-        }
-
-        // Case 1: --force => overwrite everything without prompting
-        if ($this->option('force')) {
-            $this->publish(force: true);
-            $this->info('CRUD Pack layouts installed (forced overwrite).');
-            return self::SUCCESS;
-        }
-
-        // Case 2: Nothing exists => publish normally (auto-create)
-        if (empty($existing)) {
-            $this->publish(force: false);
-            $this->info('CRUD Pack layouts installed.');
-            return self::SUCCESS;
-        }
-
-        // Case 3: Some (or all) exist => prompt whether to overwrite
-        $this->warn('Some layout view files already exist in your project:');
-        foreach ($existing as $label => $path) {
-            $this->line("  - {$label}  ({$path})");
-        }
-
-        $overwrite = $this->confirm(
-            'Do you want to overwrite existing layout files with CRUD Pack versions?',
-            false
-        );
-
-        if ($overwrite) {
-            $this->publish(force: true);
-            $this->info('CRUD Pack layouts installed (overwritten).');
-            return self::SUCCESS;
-        }
-
-        // If user says "no", we still publish missing ones (if any) without overwriting existing ones.
-        if (!empty($missing)) {
-            $this->info('Keeping existing files. Installing only missing CRUD Pack layout files...');
-            $this->publish(force: false);
-            $this->info('Missing CRUD Pack layout files installed.');
-            return self::SUCCESS;
-        }
-
-        $this->info('No changes made. Existing layout files were kept.');
-        return self::SUCCESS;
+        parent::__construct();
     }
 
-    protected function publish(bool $force): void
+    public function handle(): int
     {
-        $params = [
-            '--tag' => 'crud-pack-layouts',
+        $sourceBase = __DIR__ . '/../../resources/views';
+        $targetBase = resource_path('views');
+
+        $filesToInstall = [
+            'layouts/app.blade.php',
+            'layouts/navigation.blade.php',
+            'welcome.blade.php',
         ];
 
-        if ($force) {
-            $params['--force'] = true;
+        if (!$this->files->isDirectory($sourceBase)) {
+            $this->error("Package views directory not found: {$sourceBase}");
+            $this->line("Make sure you have: resources/views/layouts/app.blade.php, navigation.blade.php, and resources/views/welcome.blade.php in the package.");
+            return self::FAILURE;
         }
 
-        $this->call('vendor:publish', $params);
+        $force = (bool) $this->option('force');
+
+        foreach ($filesToInstall as $relative) {
+            $source = $sourceBase . DIRECTORY_SEPARATOR . $relative;
+            $target = $targetBase . DIRECTORY_SEPARATOR . $relative;
+
+            if (!$this->files->exists($source)) {
+                $this->warn("Missing in package: {$relative} (skipped)");
+                continue;
+            }
+
+            // Ensure target directory
+            $this->files->ensureDirectoryExists(dirname($target));
+
+            if ($this->files->exists($target) && !$force) {
+                $replace = $this->confirm("File exists: {$relative}. Replace it?", false);
+                if (!$replace) {
+                    $this->info("Skipped: {$relative}");
+                    continue;
+                }
+            }
+
+            $this->files->copy($source, $target);
+            $this->info("Installed: {$relative}");
+        }
+
+        $this->newLine();
+        $this->info('CRUD Pack layout views installed successfully.');
+        $this->line('Tip: You can rerun with --force to overwrite without prompts.');
+        return self::SUCCESS;
     }
 }
