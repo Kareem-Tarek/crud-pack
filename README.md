@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Blade views (Web only)
 - Shared delete-handling trait generated once per application
 - Soft delete workflows:
-  - Deleted listing
+  - Trashed listing (partially deleted resources)
   - Restore (single & bulk)
   - Force delete (single & bulk)
 - Bulk delete support
@@ -47,7 +47,7 @@ CRUD Pack includes first-class support for:
 
 - Soft deletes
 - Bulk operations
-- Deleted listings
+- Trashed listings (partially deleted resources)
 - Restore workflows
 - Force-delete workflows
 
@@ -294,7 +294,7 @@ All delete-related endpoints live **directly inside the trait**, not in controll
 ### Methods Provided
 ``` destroy ``` — single record delete (resource method)
 ``` destroyBulk ``` — bulk delete
-``` deleted ``` — list soft-deleted records
+``` trash ``` — list soft-deleted records
 ``` restore ``` — restore single record
 ``` restoreBulk ``` — restore multiple records
 ``` forceDelete ``` — permanently delete single record
@@ -313,7 +313,7 @@ All delete-related endpoints live **directly inside the trait**, not in controll
 When route generation is enabled:
 ### If ``` --soft-deletes ``` is selected
 - All soft-delete routes are generated active
-- Deleted listing, restore, force delete, and bulk operations work immediately
+- trash (Deleted) listing, restore, force delete, and bulk operations work immediately
 
 ### If ``` --no-soft-deletes ``` is selected
 - Soft-delete routes are still generated
@@ -338,7 +338,7 @@ This covers all standard CRUD actions, including **single-record destroy**.
 ### Additional Delete Routes
 Generated explicitly:
 - **destroyBulk** (destroy/delete multiple resource at once)
-- **deleted** (the blade/page that has the deleted resources by the soft-delete)
+- **trash** (the blade/page that has the deleted resources by the soft-delete)
 - **restore** (restore action for a single soft-deleted resource)
 - **restoreBulk** (restore action for a multiple soft-deleted resources)
 - **forceDelete** (permanent destroy/delete action for a single soft-deleted resource)
@@ -357,7 +357,7 @@ When views are enabled, CRUD Pack generates **Bootstrap 5–based Blade template
 - edit
 - show
 - ``` _form ``` (shared with create & edit blades)
-- deleted (soft-deleted records)
+- trash (soft-deleted records)
 
 ### View Features
 - Checkbox selection + select-all
