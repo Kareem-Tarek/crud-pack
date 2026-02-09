@@ -40,7 +40,9 @@ class CrudMakeCommand extends Command
             return self::FAILURE;
         }
 
-        // Controller type (required)
+        /* ===========================
+         | Required: Controller Type
+         =========================== */
         $isWeb = (bool) $this->option('web');
         $isApi = (bool) $this->option('api');
 
@@ -55,7 +57,9 @@ class CrudMakeCommand extends Command
             $isApi = $choice === 'api';
         }
 
-        // Soft deletes (required)
+        /* ===========================
+         | Required: Soft Deletes Mode
+         =========================== */
         $soft = (bool) $this->option('soft-deletes');
         $noSoft = (bool) $this->option('no-soft-deletes');
 
@@ -70,7 +74,9 @@ class CrudMakeCommand extends Command
             $noSoft = !$soft;
         }
 
-        // Enforce --all exclusivity + Wizard prompts
+        /* ===========================
+         | --all exclusivity + Wizard
+         =========================== */
         $allProvided = $this->optionWasProvided('all');
         $anyExplicitGenerators = $this->anyGeneratorOptionWasProvided();
 
@@ -103,7 +109,7 @@ class CrudMakeCommand extends Command
             $this->input->setOption('model', true);
             $this->input->setOption('migration', true);
             $this->input->setOption('policy', true);
-            $this->input->setOption('views', $isWeb);
+            $this->input->setOption('views', $isWeb); // never for api
         }
 
         // Invalid combinations
@@ -112,6 +118,9 @@ class CrudMakeCommand extends Command
             return self::FAILURE;
         }
 
+        /* ===========================
+         | Derived naming (Laravel conventions)
+         =========================== */
         $modelClass = $name;
         $modelVar = Str::camel($name);
         $modelVarPlural = Str::camel(Str::pluralStudly($name));
@@ -140,10 +149,14 @@ class CrudMakeCommand extends Command
         $generatePolicy = (bool) $this->option('policy');
         $generateViews = (bool) $this->option('views');
 
-        // 1) Ensure the shared trait exists (create once per app; skip later)
+        /* ===========================
+         | 1) Ensure shared trait exists
+         =========================== */
         $this->ensureSharedTrait($force);
 
-        // 2) Generate controller (always)
+        /* ===========================
+         | 2) Generate controller (always)
+         =========================== */
         $this->generateController(
             isWeb: $isWeb,
             generateRequest: $generateRequest,
@@ -157,7 +170,9 @@ class CrudMakeCommand extends Command
             force: $force
         );
 
-        // 3) Optional: Request
+        /* ===========================
+         | 3) Optional: Request
+         =========================== */
         if ($generateRequest) {
             $this->generateFromStub(
                 stub: $this->stubPath('requests/request.stub'),
@@ -171,7 +186,9 @@ class CrudMakeCommand extends Command
             );
         }
 
-        // 4) Optional: Model
+        /* ===========================
+         | 4) Optional: Model
+         =========================== */
         if ($generateModel) {
             $softImport = $soft
                 ? "use Illuminate\\Database\\Eloquent\\SoftDeletes;\n"
@@ -193,7 +210,9 @@ class CrudMakeCommand extends Command
             );
         }
 
-        // 5) Optional: Migration
+        /* ===========================
+         | 5) Optional: Migration
+         =========================== */
         if ($generateMigration) {
             $timestamp = now()->format('Y_m_d_His');
             $filename = "{$timestamp}_create_{$table}_table.php";
@@ -214,7 +233,9 @@ class CrudMakeCommand extends Command
             );
         }
 
-        // 6) Optional: Policy
+        /* ===========================
+         | 6) Optional: Policy
+         =========================== */
         if ($generatePolicy) {
             $softPolicy = $soft
                 ? $this->policySoftMethodsActive($modelClass, $modelVar)
@@ -232,7 +253,9 @@ class CrudMakeCommand extends Command
             );
         }
 
-        // 7) Optional: Views (web only)
+        /* ===========================
+         | 7) Optional: Views (web only)
+         =========================== */
         if ($generateViews && $isWeb) {
             $viewsDir = resource_path("views/{$viewFolder}");
             $this->ensureDir($viewsDir);
@@ -259,7 +282,7 @@ class CrudMakeCommand extends Command
                 force: $force
             );
 
-            // create/edit/show/_form
+            // create
             $this->generateFromStub(
                 stub: $this->stubPath('views/create.stub'),
                 target: "{$viewsDir}/create.blade.php",
@@ -272,6 +295,7 @@ class CrudMakeCommand extends Command
                 force: $force
             );
 
+            // edit
             $this->generateFromStub(
                 stub: $this->stubPath('views/edit.stub'),
                 target: "{$viewsDir}/edit.blade.php",
@@ -284,6 +308,7 @@ class CrudMakeCommand extends Command
                 force: $force
             );
 
+            // show
             $this->generateFromStub(
                 stub: $this->stubPath('views/show.stub'),
                 target: "{$viewsDir}/show.blade.php",
@@ -295,6 +320,7 @@ class CrudMakeCommand extends Command
                 force: $force
             );
 
+            // _form
             $this->generateFromStub(
                 stub: $this->stubPath('views/_form.stub'),
                 target: "{$viewsDir}/_form.blade.php",
@@ -318,7 +344,9 @@ class CrudMakeCommand extends Command
             }
         }
 
-        // 8) Optional: Routes
+        /* ===========================
+         | 8) Optional: Routes
+         =========================== */
         if ($generateRoutes) {
             $this->appendRoutes(
                 name: $name,
@@ -336,7 +364,7 @@ class CrudMakeCommand extends Command
     }
 
     /* ===========================
-     | Create trait once per app
+     | Create shared trait once per app
      =========================== */
     protected function ensureSharedTrait(bool $force): void
     {
@@ -383,8 +411,19 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
+        /**
+         * POLICY FIX (Laravel 11/12):
+         * authorizeResource() comes from AuthorizesRequests trait.
+         * If policy is enabled, we import + use it.
+         */
+        $authImport = '';
+        $classTraits = 'use HandlesDeletes;';
         $constructor = '';
+
         if ($generatePolicy) {
+            $authImport = "use Illuminate\\Foundation\\Auth\\Access\\AuthorizesRequests;\n";
+            $classTraits = "use AuthorizesRequests, HandlesDeletes;";
+
             $constructor = <<<PHP
 
     public function __construct()
@@ -410,12 +449,15 @@ PHP;
                 '{{VIEW_FOLDER}}'       => $viewFolder,
                 '{{ROUTE_NAME}}'        => $routeName,
 
-                // Support both placeholder styles to avoid stub mismatch bugs:
+                // Request placeholders
                 '{{REQUEST_IMPORT}}'    => $requestImport,
                 '{{REQUEST_TYPEHINT}}'  => $requestTypehint,
                 '{{REQUEST_CLASS}}'     => $requestTypehint,
                 '{{REQUEST_DATA}}'      => $requestData,
 
+                // Policy placeholders (Laravel 11/12 fix)
+                '{{AUTH_IMPORT}}'       => $authImport,
+                '{{CLASS_TRAITS}}'      => $classTraits,
                 '{{CONSTRUCTOR}}'       => $constructor,
             ],
             force: $force
