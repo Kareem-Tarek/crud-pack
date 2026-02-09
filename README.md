@@ -52,3 +52,29 @@ The goal is **speed without sacrificing control**.
 
 ```bash
 composer require kareemtarek/crud-pack
+```
+
+---
+## Lets jump into the package instructions ⤵︎
+
+
+## Core Concept
+CRUD Pack is centered around one single Artisan command and one resource name.
+
+From that resource name, CRUD Pack automatically derives everything else according to Laravel conventions, including:
+- Model names
+- Table names
+- Controller classes
+- Route URIs and route names
+- View directories
+- Variable names
+
+This guarantees:
+- Consistency across the application
+- Predictable structure
+- Zero naming ambiguity
+----
+## Command Overview
+```bash
+php artisan crud:make ResourceName
+```
