@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - All generated code is intended to be edited and customized by developers.
 ---
 # ⬇️ Lets get started❗ ⬇️
-# CRUD Pack *(kareemtarek/crud-pack)*
+# CRUD Pack `(kareemtarek/crud-pack)`
 
 CRUD Pack is a **blueprint-first Laravel CRUD generator** that allows developers to scaffold complete CRUD resources (Web or API) using a single Artisan command, while strictly following Laravel conventions.
 
