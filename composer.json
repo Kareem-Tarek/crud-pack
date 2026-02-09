@@ -3,6 +3,22 @@
   "description": "Reusable Laravel CRUD generator (controllers, requests, models, migrations, policies, views, routes).",
   "type": "library",
   "license": "MIT",
+  "authors": [
+        {
+            "name": "Kareem Tarek",
+            "website": "https://kareemtarek.infinityfree.me/"
+        }
+  ],
+  "keywords": [
+      "laravel",
+      "crud",
+      "generator",
+      "artisan",
+      "scaffold",
+      "soft-deletes",
+      "bulk-actions",
+      "laravel-package"
+    ],
   "require": {
     "php": "^8.0",
     "illuminate/support": "^8.0|^9.0|^10.0|^11.0|^12.0",
