@@ -553,8 +553,11 @@ PHP;
         $hasBlock = str_contains($contents, $start) && str_contains($contents, $end);
 
         if ($hasBlock && !$force) {
-            $this->warn("Routes block already exists for [{$blockId}]. Use --force to overwrite it.");
-            return;
+            $replace = $this->confirm("Routes block already exists for [{$blockId}]. Replace it?", false);
+            if (!$replace) {
+                $this->warn("Skipped routes block for [{$blockId}].");
+                return;
+            }
         }
 
         if ($hasBlock) {

@@ -83,6 +83,7 @@
 @endsection
 
 @push('scripts')
+<script>
 (function () {
     const selectAll = document.getElementById('selectAllTrashed');
     const checks = Array.from(document.querySelectorAll('.row-check-trashed'));
@@ -130,4 +131,5 @@
     form.submit();
     return true;
   }
+</script>
 @endpush
