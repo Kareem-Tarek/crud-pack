@@ -87,3 +87,37 @@ This command always generates a "controller" (wether web or api) and can optiona
 The command requires two mandatory decisions and supports optional generators through flags or an interactive wizard.
 
 ---
+## Resource Name Rules
+The resource name is the foundation of everything CRUD Pack generates and must strictly follow Laravel conventions.
+
+### Rules
+- Must be singular
+- Must be StudlyCase
+- Must NOT include suffixes like Controller, Model, Request, etc.
+
+### Valid Examples
+```bash
+php artisan crud:make Category
+php artisan crud:make Product
+php artisan crud:make ProductCategory
+
+```
+### Invalid Examples
+```bash
+php artisan crud:make categories
+php artisan crud:make category
+php artisan crud:make product_categories
+
+```
+From this single resource name, CRUD Pack dynamically derives:
+| Item              | Result                                                  |
+|-------------------|---------------------------------------------------------|
+| Model             | ```bash App\Models\Category ```                         |
+| Table             | ```bash categories ```                                  |
+| Controller (Web)  | ```bash App\Http\Controllers\CategoryController ```     |
+| Controller (API)  | ```bash App\Http\Controllers\Api\CategoryController ``` |
+| Route URI         | ```bash /categories ```                                 |
+| Route names       | ```bash categories.* ```                                |
+| Variables         | ```bash $category, $categories ```                      |
+| Views folder      | ```bash resources/views/categories ```                  |
+
