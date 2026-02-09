@@ -9,23 +9,12 @@ use Illuminate\Support\Arr;
 trait HandlesDeletes
 {
     /**
-     * The controller must define:
-     * protected string $modelClass = \App\Models\X::class;
-     *
-     * For web deleted listing view:
-     * protected string $viewFolder = 'products';
-     */
-
-    /**
      * Single delete (resource destroy).
+     * Works with Route::resource / Route::apiResource.
      *
      * IMPORTANT:
-     * We cannot type-hint Illuminate\Database\Eloquent\Model here,
-     * because Laravel will try to instantiate it from the container and fail.
-     *
-     * So we accept either:
-     * - a model instance (if passed manually), OR
-     * - an id from the route (normal case).
+     * - Do NOT typehint Illuminate\Database\Eloquent\Model here, because Laravel can't bind it.
+     * - Resource routes pass {id} by default, so we accept $id and resolve via $this->modelClass.
      */
     public function destroy($modelOrId)
     {
@@ -38,6 +27,7 @@ trait HandlesDeletes
 
     /**
      * Bulk delete (explicit route).
+     * Works whether soft deletes are on or off.
      */
     public function destroyBulk(Request $request)
     {
@@ -61,18 +51,8 @@ trait HandlesDeletes
             return response()->json($items);
         }
 
-        $viewFolder = $this->viewFolder ?? null;
-
-        if (!$viewFolder) {
-            abort(500, 'viewFolder is not defined on the controller (required for deleted() web view).');
-        }
-
-        // variable name: products / categories etc.
-        $varName = $viewFolder;
-
-        return view("{$viewFolder}.deleted", [
-            $varName => $items,
-        ]);
+        // If you want to keep using "items" in deleted.blade.php, keep this as-is.
+        return view($this->viewFolder . '.deleted', compact('items'));
     }
 
     /**
@@ -125,18 +105,6 @@ trait HandlesDeletes
         return $this->deleteResponse('Selected records permanently deleted.');
     }
 
-    /**
-     * Resolve model from either a Model instance or an id.
-     */
-    protected function resolveModel($modelOrId): Model
-    {
-        if ($modelOrId instanceof Model) {
-            return $modelOrId;
-        }
-
-        return $this->modelClass::query()->findOrFail($modelOrId);
-    }
-
     protected function extractIds(Request $request): array
     {
         $ids = $request->input('ids', []);
@@ -146,6 +114,21 @@ trait HandlesDeletes
         }
 
         return Arr::wrap($ids);
+    }
+
+    /**
+     * Resolve a model instance using $this->modelClass.
+     * Accepts either:
+     * - an Eloquent model instance (already bound)
+     * - an id (int|string) from the route param
+     */
+    protected function resolveModel($modelOrId): Model
+    {
+        if ($modelOrId instanceof Model) {
+            return $modelOrId;
+        }
+
+        return $this->modelClass::query()->findOrFail($modelOrId);
     }
 
     protected function deleteResponse(string $message)
