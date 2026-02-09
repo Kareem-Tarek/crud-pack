@@ -54,9 +54,7 @@ The goal is **speed without sacrificing control**.
 composer require kareemtarek/crud-pack
 ```
 
----
 ## Lets jump into the package instructions ⤵︎
-
 
 ## Core Concept
 CRUD Pack is centered around one single Artisan command and one resource name.
@@ -73,8 +71,19 @@ This guarantees:
 - Consistency across the application
 - Predictable structure
 - Zero naming ambiguity
-----
+---
 ## Command Overview
 ```bash
 php artisan crud:make ResourceName
 ```
+This command always generates a "controller" (wether web or api) and can optionally generate:
+- Routes
+- Eloquent model
+- Migration
+- Request validation
+- Policy
+- Blade views (Web controllers only)
+
+The command requires two mandatory decisions and supports optional generators through flags or an interactive wizard.
+
+---
