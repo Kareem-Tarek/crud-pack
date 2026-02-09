@@ -19,7 +19,18 @@ class CrudPackInstallCommand extends Command
 
     public function handle(): int
     {
-        $sourceBase = __DIR__ . '/../../resources/views';
+        // Package resources/views (at package root)
+        $packageViewsPath = dirname(__DIR__, 2) . '/resources/views';
+
+        if (!$this->files->isDirectory($packageViewsPath)) {
+            $this->error("Package views directory not found: {$packageViewsPath}");
+            $this->line('Expected files:');
+            $this->line('- resources/views/layouts/app.blade.php');
+            $this->line('- resources/views/layouts/navigation.blade.php');
+            $this->line('- resources/views/welcome.blade.php');
+            return self::FAILURE;
+        }
+
         $targetBase = resource_path('views');
 
         $filesToInstall = [
@@ -28,16 +39,12 @@ class CrudPackInstallCommand extends Command
             'welcome.blade.php',
         ];
 
-        if (!$this->files->isDirectory($sourceBase)) {
-            $this->error("Package views directory not found: {$sourceBase}");
-            $this->line("Make sure you have: resources/views/layouts/app.blade.php, navigation.blade.php, and resources/views/welcome.blade.php in the package.");
-            return self::FAILURE;
-        }
-
         $force = (bool) $this->option('force');
 
+        $this->info('Installing CRUD Pack layout views...');
+
         foreach ($filesToInstall as $relative) {
-            $source = $sourceBase . DIRECTORY_SEPARATOR . $relative;
+            $source = $packageViewsPath . DIRECTORY_SEPARATOR . $relative;
             $target = $targetBase . DIRECTORY_SEPARATOR . $relative;
 
             if (!$this->files->exists($source)) {
@@ -45,7 +52,6 @@ class CrudPackInstallCommand extends Command
                 continue;
             }
 
-            // Ensure target directory
             $this->files->ensureDirectoryExists(dirname($target));
 
             if ($this->files->exists($target) && !$force) {
@@ -61,8 +67,10 @@ class CrudPackInstallCommand extends Command
         }
 
         $this->newLine();
-        $this->info('CRUD Pack layout views installed successfully.');
-        $this->line('Tip: You can rerun with --force to overwrite without prompts.');
+        $this->info('✅ CRUD Pack layout views installed successfully.');
+        $this->line('Tip: run again with --force to overwrite without prompts.');
+        $this->line('Optional: php artisan vendor:publish --tag=crud-pack-views');
+
         return self::SUCCESS;
     }
 }

@@ -15,17 +15,19 @@ class CrudPackServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Register Artisan commands
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                CrudMakeCommand::class,
-                CrudPackInstallCommand::class,
-            ]);
-
-            // Allow vendor:publish of the layout/welcome blades (optional alternative to crud:install)
-            $this->publishes([
-                __DIR__ . '/../../resources/views' => resource_path('views'),
-            ], 'crud-pack-views');
+        if (!$this->app->runningInConsole()) {
+            return;
         }
+
+        // ✅ Register Artisan commands
+        $this->commands([
+            CrudMakeCommand::class,
+            CrudPackInstallCommand::class,
+        ]);
+
+        // ✅ Allow vendor:publish for the package views
+        $this->publishes([
+            dirname(__DIR__, 2) . '/resources/views' => resource_path('views'),
+        ], 'crud-pack-views');
     }
 }
