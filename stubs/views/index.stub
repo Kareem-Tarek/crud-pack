@@ -13,7 +13,7 @@
     </div>
 
     <div class="d-flex gap-2">
-      <a href="{{ route('{{ROUTE_NAME}}.create') }}" class="btn btn-primary">Create</a>
+      <a href="{{ route('{{ROUTE_NAME}}.create') }}" class="btn btn-success">Create</a>
 {{DELETED_BUTTON}}
     </div>
   </div>

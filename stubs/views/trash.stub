@@ -12,7 +12,9 @@
       </span>
     </div>
 
-    <a href="{{ route('{{ROUTE_NAME}}.index') }}" class="btn btn-outline-secondary">Back</a>
+    <a href="{{ route('{{ROUTE_NAME}}.index') }}" class="btn btn-outline-secondary">
+      Back To {{MODEL_CLASS}} List
+    </a>
   </div>
 
   @if(session('success'))
