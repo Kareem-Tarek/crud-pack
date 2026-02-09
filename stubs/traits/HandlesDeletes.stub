@@ -26,16 +26,18 @@ trait HandlesDeletes
     }
 
     /**
-     * Bulk delete (explicit route).
-     * Works whether soft deletes are on or off.
-     */
+    * Bulk delete (explicit route).
+    * Works whether soft deletes are on or off.
+    */
     public function destroyBulk(Request $request)
     {
         $ids = $this->extractIds($request);
 
-        if (!empty($ids)) {
-            $this->modelClass::query()->whereKey($ids)->delete();
+        if (empty($ids)) {
+            return $this->deleteResponse('No records selected.');
         }
+
+        $this->modelClass::query()->whereKey($ids)->delete();
 
         return $this->deleteResponse('Selected records deleted.');
     }

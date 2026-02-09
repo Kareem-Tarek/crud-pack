@@ -625,90 +625,107 @@ PHP;
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
     {
         return <<<BLADE
-  <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}">
-    @csrf
-    @method('DELETE')
-
     <div class="card">
-      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="card-body d-flex justify-content-between align-items-center">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="selectAll">
-          <label class="form-check-label" for="selectAll">Select All</label>
+            <input class="form-check-input" type="checkbox" id="selectAll">
+            <label class="form-check-label" for="selectAll">Select All</label>
         </div>
 
-        <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-          onclick="return confirm('Delete selected records?')">
-          Delete Selected
-        </button>
-      </div>
+        <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="m-0">
+            @csrf
+            @method('DELETE')
+            <div id="bulkHiddenIds"></div>
 
-      <div class="table-responsive">
+            <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
+            onclick="return confirm('Delete selected records?')">
+            Delete Selected
+            </button>
+        </form>
+        </div>
+
+        <div class="table-responsive">
         <table class="table table-striped table-hover mb-0 align-middle">
-          <thead>
+            <thead>
             <tr>
-              <th style="width:50px;"></th>
-              <th style="width:90px;">ID</th>
-              <th>Name</th>
-              <th style="width:260px;" class="text-end">Actions</th>
+                <th style="width:50px;"></th>
+                <th style="width:90px;">ID</th>
+                <th>Name</th>
+                <th style="width:260px;" class="text-end">Actions</th>
             </tr>
-          </thead>
-          <tbody>
+            </thead>
+            <tbody>
             @forelse(\${$modelVarPlural} as \$item)
-              <tr>
+                <tr>
                 <td>
-                  <input class="form-check-input row-check" type="checkbox" name="ids[]" value="{{ \$item->id }}">
+                    <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
                 </td>
                 <td>{{ \$item->id }}</td>
                 <td>{{ \$item->name ?? '-' }}</td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
-                  <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
+                    <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
+                    <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
 
-                  <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
+                    <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
                     @csrf
                     @method('DELETE')
                     <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')">Delete</button>
-                  </form>
+                    </form>
                 </td>
-              </tr>
+                </tr>
             @empty
-              <tr>
+                <tr>
                 <td colspan="4" class="text-center text-muted py-4">No records found.</td>
-              </tr>
+                </tr>
             @endforelse
-          </tbody>
+            </tbody>
         </table>
-      </div>
+        </div>
     </div>
-  </form>
 
-  <script>
-    (function () {
-      const selectAll = document.getElementById('selectAll');
-      const checks = Array.from(document.querySelectorAll('.row-check'));
-      const bulkBtn = document.getElementById('bulkDeleteBtn');
+    <script>
+        (function () {
+        const selectAll = document.getElementById('selectAll');
+        const checks = Array.from(document.querySelectorAll('.row-check'));
+        const bulkBtn = document.getElementById('bulkDeleteBtn');
+        const bulkForm = document.getElementById('bulkDeleteForm');
+        const hiddenWrap = document.getElementById('bulkHiddenIds');
 
-      function syncState() {
-        const anyChecked = checks.some(c => c.checked);
-        bulkBtn.disabled = !anyChecked;
+        function syncState() {
+            const anyChecked = checks.some(c => c.checked);
+            bulkBtn.disabled = !anyChecked;
 
-        const allChecked = checks.length > 0 && checks.every(c => c.checked);
-        selectAll.checked = allChecked;
-        selectAll.indeterminate = anyChecked && !allChecked;
-      }
+            const allChecked = checks.length > 0 && checks.every(c => c.checked);
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = anyChecked && !allChecked;
+        }
 
-      if (selectAll) {
-        selectAll.addEventListener('change', function () {
-          checks.forEach(c => c.checked = selectAll.checked);
-          syncState();
-        });
-      }
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+            checks.forEach(c => c.checked = selectAll.checked);
+            syncState();
+            });
+        }
 
-      checks.forEach(c => c.addEventListener('change', syncState));
-      syncState();
-    })();
-  </script>
-BLADE;
+        checks.forEach(c => c.addEventListener('change', syncState));
+        syncState();
+
+        if (bulkForm) {
+            bulkForm.addEventListener('submit', function (e) {
+            // rebuild hidden ids[] inputs
+            hiddenWrap.innerHTML = '';
+            checks.filter(c => c.checked).forEach(c => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'ids[]';
+                input.value = c.value;
+                hiddenWrap.appendChild(input);
+            });
+            });
+        }
+        })();
+    </script>
+    BLADE;
     }
 
     /* ===========================
