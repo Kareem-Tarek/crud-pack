@@ -248,8 +248,8 @@ class CrudMakeCommand extends Command
             $this->ensureDir($viewsDir);
 
             $deletedButton = $soft
-                ? "      <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a>\n"
-                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a> --}}\n";
+                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a>\n"
+                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a> --}}\n";
 
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
 
@@ -317,8 +317,8 @@ class CrudMakeCommand extends Command
 
             if ($soft) {
                 $this->generateFromStub(
-                    stub: $this->stubPath('views/deleted.stub'),
-                    target: "{$viewsDir}/deleted.blade.php",
+                    stub: $this->stubPath('views/trash.stub'),
+                    target: "{$viewsDir}/trash.blade.php",
                     replacements: [
                         '{{MODEL_CLASS}}' => $modelClass,
                         '{{ROUTE_NAME}}'  => $routeName,
@@ -637,13 +637,13 @@ PHP;
         $softRoutes = [];
 
         if ($isWeb) {
-            $softRoutes[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted'])->name('{$routeName}.deleted');";
+            $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('{$routeName}.trash');";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('{$routeName}.restore');";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('{$routeName}.restoreBulk');";
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
             $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
         } else {
-            $softRoutes[] = "Route::get('{$uri}/deleted', [{$controllerFqn}, 'deleted']);";
+            $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash']);";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore']);";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk']);";
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete']);";
@@ -771,7 +771,7 @@ PHP;
     /**
      * List soft-deleted records (explicit route) — soft deletes only.
      */
-    public function deleted()
+    public function trash()
     {
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
         $items = $this->modelClass::onlyTrashed()->paginate(15);
@@ -785,7 +785,7 @@ PHP;
             ]);
         }
 
-        return view($this->viewFolder . '.deleted', compact('items', 'trashedTotal'));
+        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
     }
 
     /**

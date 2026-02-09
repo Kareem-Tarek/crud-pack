@@ -104,7 +104,7 @@ class CrudPackTraitCommand extends Command
     /**
      * List soft-deleted records (explicit route) — soft deletes only.
      */
-    public function deleted()
+    public function trash()
     {
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
         $items = $this->modelClass::onlyTrashed()->paginate(15);
@@ -118,7 +118,7 @@ class CrudPackTraitCommand extends Command
             ]);
         }
 
-        return view($this->viewFolder . '.deleted', compact('items', 'trashedTotal'));
+        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
     }
 
     /**
