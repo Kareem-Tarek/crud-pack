@@ -180,7 +180,43 @@ php artisan crud:make Category --web --soft-deletes --all
 - **never generates views**
 
 ### Important Rules
-- ``` --all ``` is exclusive
+- ``` --all ``` is **exclusive**
 - It cannot be combined with any other generator flags
-- Invalid combinations cause a hard error and stop execution
+- Invalid combinations cause a **hard error** and stop execution
+---
+## Wizard Mode (Interactive Prompts)
+If the developer:
+- does not pass ``` --all ```
+- and does not explicitly pass any optional generator flags
+
+CRUD Pack enters **wizard mode** and prompts the developer with yes/no questions:
+- Generate routes?
+- Generate model?
+- Generate migration?
+- Generate request validation?
+- Generate policy?
+- Generate views? (Web only)
+
+If the controller type is API, the views prompt is **never shown**.
+
+---
+## Shared Delete-Handling Trait (Created Once Per App)
+CRUD Pack uses **one shared delete-handling trait** across the entire application.
+
+### Trait Location
+```bash
+app/Http/Controllers/Concerns/HandlesDeletes.php
+```
+### Behavior
+- The trait is generated **once per Laravel application**
+- On the first CRUD generation, the trait is created
+- On subsequent CRUD generations:
+    - The trait is detected
+    - Creation is skipped
+    - A message is printed indicating it already exists
+
+This ensures:
+- No duplicated delete logic
+- One consistent delete blueprint
+- Reusable behavior across all controllers
 ---
