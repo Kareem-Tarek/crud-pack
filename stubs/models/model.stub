@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Models;
+
+{{SOFT_IMPORT}}
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class {{MODEL_CLASS}} extends Model
+{
+    use HasFactory;
+{{SOFT_USE}}
+
+    protected $fillable = [
+        'name',
+    ];
+}

@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\User;
+use App\Models\{{MODEL_CLASS}};
+
+class {{MODEL_CLASS}}Policy
+{
+    public function viewAny(User $user): bool { return true; }
+    public function view(User $user, {{MODEL_CLASS}} ${{MODEL_VAR}}): bool { return true; }
+    public function create(User $user): bool { return true; }
+    public function update(User $user, {{MODEL_CLASS}} ${{MODEL_VAR}}): bool { return true; }
+    public function delete(User $user, {{MODEL_CLASS}} ${{MODEL_VAR}}): bool { return true; }
+
+{{SOFT_POLICY_METHODS}}
+}

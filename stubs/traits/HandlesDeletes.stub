@@ -1,0 +1,119 @@
+<?php
+
+namespace App\Http\Controllers\Concerns;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+
+trait HandlesDeletes
+{
+    /**
+     * Single delete (resource destroy).
+     * Works with Route::resource / Route::apiResource.
+     */
+    public function destroy(Model $model)
+    {
+        $model->delete();
+
+        return $this->deleteResponse('Deleted successfully.');
+    }
+
+    /**
+     * Bulk delete (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function destroyBulk(Request $request)
+    {
+        $ids = $this->extractIds($request);
+
+        if (!empty($ids)) {
+            $this->modelClass::query()->whereKey($ids)->delete();
+        }
+
+        return $this->deleteResponse('Selected records deleted.');
+    }
+
+    /**
+     * List soft-deleted records (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function deleted()
+    {
+        $items = $this->modelClass::onlyTrashed()->paginate(15);
+
+        if (request()->expectsJson()) {
+            return response()->json($items);
+        }
+
+        return view($this->viewFolder . '.deleted', compact('items'));
+    }
+
+    /**
+     * Restore single (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function restore(int|string $id)
+    {
+        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
+        $model->restore();
+
+        return $this->deleteResponse('Restored successfully.');
+    }
+
+    /**
+     * Restore bulk (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function restoreBulk(Request $request)
+    {
+        $ids = $this->extractIds($request);
+
+        if (!empty($ids)) {
+            $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+        }
+
+        return $this->deleteResponse('Selected records restored.');
+    }
+
+    /**
+     * Force delete single (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function forceDelete(int|string $id)
+    {
+        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
+        $model->forceDelete();
+
+        return $this->deleteResponse('Permanently deleted.');
+    }
+
+    /**
+     * Force delete bulk (explicit route) — enabled only when soft-deletes is chosen.
+     */
+    public function forceDeleteBulk(Request $request)
+    {
+        $ids = $this->extractIds($request);
+
+        if (!empty($ids)) {
+            $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+        }
+
+        return $this->deleteResponse('Selected records permanently deleted.');
+    }
+
+    protected function extractIds(Request $request): array
+    {
+        $ids = $request->input('ids', []);
+
+        if (is_string($ids)) {
+            $ids = array_filter(array_map('trim', explode(',', $ids)));
+        }
+
+        return Arr::wrap($ids);
+    }
+
+    protected function deleteResponse(string $message)
+    {
+        if (request()->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+}

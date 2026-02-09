@@ -1,0 +1,39 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+{{REQUEST_IMPORT}}
+use App\Models\{{MODEL_CLASS}};
+use App\Http\Controllers\Concerns\HandlesDeletes;
+
+class {{MODEL_CLASS}}Controller extends Controller
+{
+    use HandlesDeletes;
+
+    protected string $modelClass = {{MODEL_CLASS}}::class;
+
+{{CONSTRUCTOR}}
+
+    public function index()
+    {
+        return {{MODEL_CLASS}}::query()->paginate(15);
+    }
+
+    public function store({{REQUEST_TYPEHINT}} $request)
+    {
+        $record = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+        return response()->json($record, 201);
+    }
+
+    public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
+    {
+        return response()->json(${{MODEL_VAR}});
+    }
+
+    public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
+    {
+        ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+        return response()->json(${{MODEL_VAR}});
+    }
+}

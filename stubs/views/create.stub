@@ -1,0 +1,29 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 m-0">Create {{MODEL_CLASS}}</h1>
+    <a href="{{ route('{{ROUTE_NAME}}.index') }}" class="btn btn-outline-secondary">Back</a>
+  </div>
+
+  @if ($errors->any())
+    <div class="alert alert-danger">Please fix the errors below.</div>
+  @endif
+
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" action="{{ route('{{ROUTE_NAME}}.store') }}">
+        @csrf
+
+        @include('{{VIEW_FOLDER}}._form')
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary">Save</button>
+          <a class="btn btn-light" href="{{ route('{{ROUTE_NAME}}.index') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+@endsection
