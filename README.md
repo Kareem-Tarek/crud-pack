@@ -112,12 +112,12 @@ php artisan crud:make product_categories
 From this single resource name, CRUD Pack dynamically derives:
 | Item              | Result                                                  |
 |-------------------|---------------------------------------------------------|
-| Model             | ```bash App\Models\Category ```                         |
-| Table             | ```bash categories ```                                  |
-| Controller (Web)  | ```bash App\Http\Controllers\CategoryController ```     |
-| Controller (API)  | ```bash App\Http\Controllers\Api\CategoryController ``` |
-| Route URI         | ```bash /categories ```                                 |
-| Route names       | ```bash categories.* ```                                |
-| Variables         | ```bash $category, $categories ```                      |
-| Views folder      | ```bash resources/views/categories ```                  |
+| Model             | ``` App\Models\Category ```                         |
+| Table             | ``` categories ```                                  |
+| Controller (Web)  | ``` App\Http\Controllers\CategoryController ```     |
+| Controller (API)  | ``` App\Http\Controllers\Api\CategoryController ``` |
+| Route URI         | ``` /categories ```                                 |
+| Route names       | ``` categories.* ```                                |
+| Variables         | ``` $category, $categories ```                      |
+| Views folder      | ``` resources/views/categories ```                  |
 
