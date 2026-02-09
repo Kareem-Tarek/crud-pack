@@ -146,3 +146,41 @@ php artisan crud:make Category --web --soft-deletes
 If either decision is missing, CRUD Pack will prompt the developer to choose.
 
 ---
+## Optional Generators
+In addition to the controller (which is always generated), CRUD Pack can optionally generate:
+| Option              | Description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| ``` --routes ```    | Append routes to ``` routes/web.php ``` or ``` routes/api.php ``` |
+| ``` --model ```     | Generate an Eloquent model                                        |
+| ``` --migration ``` | Generate a migration                                              |
+| ``` --request ```   | Generate a single FormRequest (used for store & update)           |
+| ``` --policy ```    | Generate a policy and wire authorization                          |
+| ``` --views ```     | Generate Blade views (Web only)                                   |
+---
+## The --all Shortcut
+CRUD Pack provides a convenience shortcut:
+```bash
+php artisan crud:make Category --web --soft-deletes --all
+```
+### Behavior of --all
+#### Web controller
+- routes
+- model
+- migration
+- request
+- policy
+- views
+
+#### API controller
+- routes
+- model
+- migration
+- request
+- policy
+- **never generates views**
+
+### Important Rules
+- ``` --all ``` is exclusive
+- It cannot be combined with any other generator flags
+- Invalid combinations cause a hard error and stop execution
+---
