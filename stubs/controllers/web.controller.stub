@@ -52,14 +52,4 @@ class {{MODEL_CLASS}}Controller extends Controller
 
         return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} updated successfully.');
     }
-
-    /**
-     * NOTE:
-     * If you want implicit route-model binding for destroy, you must typehint the real model here.
-     * The delete logic itself stays in HandlesDeletes.
-     */
-    public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
-    {
-        return $this->performDestroy(${{MODEL_VAR}});
-    }
 }

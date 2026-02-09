@@ -38,9 +38,4 @@ class {{MODEL_CLASS}}Controller extends Controller
 
         return response()->json(${{MODEL_VAR}});
     }
-
-    public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
-    {
-        return $this->performDestroy(${{MODEL_VAR}});
-    }
 }

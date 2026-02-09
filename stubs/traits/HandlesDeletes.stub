@@ -3,20 +3,37 @@
 namespace App\Http\Controllers\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
 trait HandlesDeletes
 {
     /**
-     * Real single-delete logic (called by controller destroy() for model binding).
+     * The controller must define:
+     * protected string $modelClass = \App\Models\X::class;
+     *
+     * For web deleted listing view:
+     * protected string $viewFolder = 'products';
      */
-    protected function performDestroy(Model $model)
+
+    /**
+     * Single delete (resource destroy).
+     *
+     * IMPORTANT:
+     * We cannot type-hint Illuminate\Database\Eloquent\Model here,
+     * because Laravel will try to instantiate it from the container and fail.
+     *
+     * So we accept either:
+     * - a model instance (if passed manually), OR
+     * - an id from the route (normal case).
+     */
+    public function destroy($modelOrId)
     {
+        $model = $this->resolveModel($modelOrId);
+
         $model->delete();
 
-        return $this->actionResponse('Deleted successfully.');
+        return $this->deleteResponse('Deleted successfully.');
     }
 
     /**
@@ -30,7 +47,7 @@ trait HandlesDeletes
             $this->modelClass::query()->whereKey($ids)->delete();
         }
 
-        return $this->actionResponse('Selected records deleted.');
+        return $this->deleteResponse('Selected records deleted.');
     }
 
     /**
@@ -38,21 +55,23 @@ trait HandlesDeletes
      */
     public function deleted()
     {
-        if ($resp = $this->requireSoftDeletes()) {
-            return $resp;
-        }
-
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
         if (request()->expectsJson()) {
             return response()->json($items);
         }
 
-        // Web: pass the plural variable dynamically (e.g. $products, $categories)
-        $var = $this->modelVarPlural ?? 'items';
+        $viewFolder = $this->viewFolder ?? null;
 
-        return view($this->viewFolder . '.deleted', [
-            $var => $items,
+        if (!$viewFolder) {
+            abort(500, 'viewFolder is not defined on the controller (required for deleted() web view).');
+        }
+
+        // variable name: products / categories etc.
+        $varName = $viewFolder;
+
+        return view("{$viewFolder}.deleted", [
+            $varName => $items,
         ]);
     }
 
@@ -61,14 +80,10 @@ trait HandlesDeletes
      */
     public function restore(int|string $id)
     {
-        if ($resp = $this->requireSoftDeletes()) {
-            return $resp;
-        }
-
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->restore();
 
-        return $this->actionResponse('Restored successfully.');
+        return $this->deleteResponse('Restored successfully.');
     }
 
     /**
@@ -76,17 +91,13 @@ trait HandlesDeletes
      */
     public function restoreBulk(Request $request)
     {
-        if ($resp = $this->requireSoftDeletes()) {
-            return $resp;
-        }
-
         $ids = $this->extractIds($request);
 
         if (!empty($ids)) {
             $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
         }
 
-        return $this->actionResponse('Selected records restored.');
+        return $this->deleteResponse('Selected records restored.');
     }
 
     /**
@@ -94,14 +105,10 @@ trait HandlesDeletes
      */
     public function forceDelete(int|string $id)
     {
-        if ($resp = $this->requireSoftDeletes()) {
-            return $resp;
-        }
-
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->forceDelete();
 
-        return $this->actionResponse('Permanently deleted.');
+        return $this->deleteResponse('Permanently deleted.');
     }
 
     /**
@@ -109,31 +116,25 @@ trait HandlesDeletes
      */
     public function forceDeleteBulk(Request $request)
     {
-        if ($resp = $this->requireSoftDeletes()) {
-            return $resp;
-        }
-
         $ids = $this->extractIds($request);
 
         if (!empty($ids)) {
             $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
         }
 
-        return $this->actionResponse('Selected records permanently deleted.');
+        return $this->deleteResponse('Selected records permanently deleted.');
     }
 
     /**
-     * Ensure model uses SoftDeletes trait.
+     * Resolve model from either a Model instance or an id.
      */
-    protected function requireSoftDeletes()
+    protected function resolveModel($modelOrId): Model
     {
-        $uses = class_uses_recursive($this->modelClass) ?: [];
-
-        if (!in_array(SoftDeletes::class, $uses, true)) {
-            return $this->actionResponse('Soft deletes are not enabled for this resource.', 400, 'error');
+        if ($modelOrId instanceof Model) {
+            return $modelOrId;
         }
 
-        return null;
+        return $this->modelClass::query()->findOrFail($modelOrId);
     }
 
     protected function extractIds(Request $request): array
@@ -147,17 +148,12 @@ trait HandlesDeletes
         return Arr::wrap($ids);
     }
 
-    /**
-     * Unified response:
-     * - JSON when expectsJson()
-     * - Redirect back with flash message for web
-     */
-    protected function actionResponse(string $message, int $status = 200, string $flashKey = 'success')
+    protected function deleteResponse(string $message)
     {
         if (request()->expectsJson()) {
-            return response()->json(['message' => $message], $status);
+            return response()->json(['message' => $message]);
         }
 
-        return redirect()->back()->with($flashKey, $message);
+        return redirect()->back()->with('success', $message);
     }
 }
