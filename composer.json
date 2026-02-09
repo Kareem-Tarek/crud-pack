@@ -1,5 +1,5 @@
 {
-  "name": "Kareem-Tarek/crud-pack",
+  "name": "kareemtarek/crud-pack",
   "description": "Reusable Laravel CRUD generator (controllers, requests, models, migrations, policies, views, routes).",
   "type": "library",
   "license": "MIT",

@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
-        'name' => 'Kareem-Tarek/crud-pack',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'name' => 'kareemtarek/crud-pack',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '3368c6c56bbbe978759779719e8b4f4312c1df4a',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -145,10 +145,10 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
-        'Kareem-Tarek/crud-pack' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+        'kareemtarek/crud-pack' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '3368c6c56bbbe978759779719e8b4f4312c1df4a',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
