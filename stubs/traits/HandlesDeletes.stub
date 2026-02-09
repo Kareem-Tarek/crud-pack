@@ -13,8 +13,8 @@ trait HandlesDeletes
      * Works with Route::resource / Route::apiResource.
      *
      * IMPORTANT:
-     * - Do NOT typehint Illuminate\Database\Eloquent\Model here, because Laravel can't bind it.
-     * - Resource routes pass {id} by default, so we accept $id and resolve via $this->modelClass.
+     * - Resource destroy receives {product} model binding if controller destroy(Product $product)
+     * - If it receives id, we resolve via $this->modelClass.
      */
     public function performDestroy($modelOrId)
     {
@@ -26,10 +26,10 @@ trait HandlesDeletes
     }
 
     /**
-    * Bulk delete (explicit route).
-    * Works whether soft deletes are on or off.
-    */
-    public function destroyBulk(Request $request)
+     * Bulk delete (explicit route: {uri}/bulk).
+     * Works whether soft deletes are on or off.
+     */
+    public function performDestroyBulk(Request $request)
     {
         $ids = $this->extractIds($request);
 
@@ -42,88 +42,30 @@ trait HandlesDeletes
         return $this->deleteResponse('Selected records deleted.');
     }
 
-    /**
-     * List soft-deleted records (explicit route) — soft deletes only.
-     */
-    public function deleted()
-    {
-        $items = $this->modelClass::onlyTrashed()->paginate(15);
+    /* ============================================================
+     | SOFT DELETE FEATURES (generated active or commented by CLI)
+     | If --soft-deletes => UNCOMMENTED
+     | If --no-soft-deletes => COMMENTED
+     ============================================================ */
 
-        if (request()->expectsJson()) {
-            return response()->json($items);
-        }
+{{SOFT_TRAIT_METHODS}}
 
-        // If you want to keep using "items" in deleted.blade.php, keep this as-is.
-        return view($this->viewFolder . '.deleted', compact('items'));
-    }
-
-    /**
-     * Restore single (explicit route) — soft deletes only.
-     */
-    public function restore(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->restore();
-
-        return $this->deleteResponse('Restored successfully.');
-    }
-
-    /**
-     * Restore bulk (explicit route) — soft deletes only.
-     */
-    public function restoreBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
-        }
-
-        return $this->deleteResponse('Selected records restored.');
-    }
-
-    /**
-     * Force delete single (explicit route) — soft deletes only.
-     */
-    public function forceDelete(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->forceDelete();
-
-        return $this->deleteResponse('Permanently deleted.');
-    }
-
-    /**
-     * Force delete bulk (explicit route) — soft deletes only.
-     */
-    public function forceDeleteBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
-        }
-
-        return $this->deleteResponse('Selected records permanently deleted.');
-    }
+    /* ===========================
+     | Utilities
+     =========================== */
 
     protected function extractIds(Request $request): array
     {
+        // Supports ids[] checkboxes OR comma-separated string "1,2,3"
         $ids = $request->input('ids', []);
 
         if (is_string($ids)) {
             $ids = array_filter(array_map('trim', explode(',', $ids)));
         }
 
-        return Arr::wrap($ids);
+        return array_values(array_filter(Arr::wrap($ids)));
     }
 
-    /**
-     * Resolve a model instance using $this->modelClass.
-     * Accepts either:
-     * - an Eloquent model instance (already bound)
-     * - an id (int|string) from the route param
-     */
     protected function resolveModel($modelOrId): Model
     {
         if ($modelOrId instanceof Model) {

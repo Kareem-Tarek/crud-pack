@@ -2,38 +2,33 @@
 
 namespace App\Http\Controllers;
 
-{{REQUEST_IMPORT}}{{AUTH_IMPORT}}use App\Models\{{MODEL_CLASS}};
-use App\Http\Controllers\Controller;
+{{REQUEST_IMPORT}}use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Concerns\HandlesDeletes;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
-    {{CLASS_TRAITS}}
+    use HandlesDeletes;
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
-    // Used by HandlesDeletes::deleted() to resolve the deleted view.
+    // Used by HandlesDeletes::performDeleted() to resolve the deleted view.
     protected string $viewFolder = '{{VIEW_FOLDER}}';
 
-{{CONSTRUCTOR}}
     public function index()
     {
         ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
-
         return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}'));
     }
 
     public function create()
     {
         ${{MODEL_VAR}} = new {{MODEL_CLASS}}();
-
         return view('{{VIEW_FOLDER}}.create', compact('{{MODEL_VAR}}'));
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)
     {
         {{MODEL_CLASS}}::create({{REQUEST_DATA}});
-
         return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} created successfully.');
     }
 
@@ -50,7 +45,6 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
         ${{MODEL_VAR}}->update({{REQUEST_DATA}});
-
         return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} updated successfully.');
     }
 
@@ -58,4 +52,11 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
         return $this->performDestroy(${{MODEL_VAR}});
     }
+
+    public function destroyBulk(\Illuminate\Http\Request $request)
+    {
+        return $this->performDestroyBulk($request);
+    }
+
+{{SOFT_CONTROLLER_METHODS_WEB}}
 }

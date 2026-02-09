@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('{{TABLE}}', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+{{SOFT_MIGRATION_COLUMN}}
             $table->timestamps();
-{{SOFT_COLUMN}}
         });
     }
 
