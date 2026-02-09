@@ -305,15 +305,15 @@ Route::resource('categories', CategoryController::class);
 ```bash
 Route::apiResource('categories', Api\CategoryController::class);
 ```
-This covers all standard CRUD actions, including single-record destroy.
+This covers all standard CRUD actions, including **single-record destroy**.
 ### Additional Delete Routes
 Generated explicitly:
-- destroyBulk (destroy/delete multiple resource at once)
-- deleted (the blade/page that has the deleted resources by the soft-delete)
-- restore (restore action for a single soft-deleted resource)
-- restoreBulk (restore action for a multiple soft-deleted resources)
-- forceDelete (permanent destroy/delete action for a single soft-deleted resource)
-- forceDeleteBulk (permanent destroy/delete action for a multiple soft-deleted resources)
+- **destroyBulk** (destroy/delete multiple resource at once)
+- **deleted** (the blade/page that has the deleted resources by the soft-delete)
+- **restore** (restore action for a single soft-deleted resource)
+- **restoreBulk** (restore action for a multiple soft-deleted resources)
+- **forceDelete** (permanent destroy/delete action for a single soft-deleted resource)
+- **forceDeleteBulk** (permanent destroy/delete action for a multiple soft-deleted resources)
 
 These routes are:
 - Appended to the correct routes file (web or api, based on the option entered in the CLI)
