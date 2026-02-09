@@ -52,4 +52,9 @@ class {{MODEL_CLASS}}Controller extends Controller
 
         return redirect()->route('{{ROUTE_NAME}}.index')->with('success', '{{MODEL_CLASS}} updated successfully.');
     }
+
+    public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})
+    {
+        return $this->performDestroy(${{MODEL_VAR}});
+    }
 }

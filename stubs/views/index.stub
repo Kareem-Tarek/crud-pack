@@ -21,5 +21,4 @@
     {{ ${{MODEL_VAR_PLURAL}}->links() }}
   </div>
 </div>
-
 @endsection

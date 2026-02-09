@@ -625,110 +625,115 @@ PHP;
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
     {
         return <<<BLADE
-    {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
-    <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
+        {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
+        <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
         @csrf
         @method('DELETE')
 
+        {{-- We'll submit selected IDs as a comma-separated string --}}
         <input type="hidden" name="ids" id="bulkIds" value="">
 
         <div class="card">
-        <div class="card-body d-flex justify-content-between align-items-center">
+            <div class="card-body d-flex justify-content-between align-items-center">
             <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="selectAll">
-            <label class="form-check-label" for="selectAll">Select All</label>
+                <input class="form-check-input" type="checkbox" id="selectAll">
+                <label class="form-check-label" for="selectAll">Select All</label>
             </div>
 
             <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-            onclick="return confirm('Delete selected records?')">
-            Delete Selected
+                onclick="return confirm('Delete selected records?')">
+                Delete Selected
             </button>
+            </div>
         </div>
-        </div>
-    </form>
+        </form>
 
-    {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
-    <div class="card">
+        {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
+        <div class="card">
         <div class="table-responsive">
-        <table class="table table-striped table-hover mb-0 align-middle">
+            <table class="table table-striped table-hover mb-0 align-middle">
             <thead>
-            <tr>
+                <tr>
                 <th style="width:50px;"></th>
                 <th style="width:90px;">ID</th>
                 <th>Name</th>
                 <th style="width:260px;" class="text-end">Actions</th>
-            </tr>
+                </tr>
             </thead>
             <tbody>
-            @forelse(\${$modelVarPlural} as \$item)
+                @forelse(\${$modelVarPlural} as \$item)
                 <tr>
-                <td>
+                    <td>
                     <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
-                </td>
-                <td>{{ \$item->id }}</td>
-                <td>{{ \$item->name ?? '-' }}</td>
-                <td class="text-end">
+                    </td>
+                    <td>{{ \$item->id }}</td>
+                    <td>{{ \$item->name ?? '-' }}</td>
+                    <td class="text-end">
                     <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
                     <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
 
+                    {{-- Single delete: separate form (safe because table is NOT wrapped by bulk form) --}}
                     <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                        onclick="return confirm('Delete?')">Delete</button>
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Delete?')">
+                        Delete
+                        </button>
                     </form>
-                </td>
+                    </td>
                 </tr>
-            @empty
+                @empty
                 <tr>
-                <td colspan="4" class="text-center text-muted py-4">No records found.</td>
+                    <td colspan="4" class="text-center text-muted py-4">No records found.</td>
                 </tr>
-            @endforelse
+                @endforelse
             </tbody>
-        </table>
+            </table>
         </div>
-    </div>
+        </div>
 
-    <script>
+        <script>
         (function () {
-        const selectAll = document.getElementById('selectAll');
-        const checks = Array.from(document.querySelectorAll('.row-check'));
-        const bulkBtn = document.getElementById('bulkDeleteBtn');
-        const bulkIds = document.getElementById('bulkIds');
-        const bulkForm = document.getElementById('bulkDeleteForm');
+            const selectAll = document.getElementById('selectAll');
+            const checks = Array.from(document.querySelectorAll('.row-check'));
+            const bulkBtn = document.getElementById('bulkDeleteBtn');
+            const bulkIds = document.getElementById('bulkIds');
+            const bulkForm = document.getElementById('bulkDeleteForm');
 
-        function selectedIds() {
+            function selectedIds() {
             return checks.filter(c => c.checked).map(c => c.value);
-        }
+            }
 
-        function syncState() {
+            function syncState() {
             const ids = selectedIds();
             bulkBtn.disabled = ids.length === 0;
 
             const allChecked = checks.length > 0 && ids.length === checks.length;
             selectAll.checked = allChecked;
             selectAll.indeterminate = ids.length > 0 && !allChecked;
-        }
+            }
 
-        if (selectAll) {
+            if (selectAll) {
             selectAll.addEventListener('change', function () {
-            checks.forEach(c => c.checked = selectAll.checked);
-            syncState();
+                checks.forEach(c => c.checked = selectAll.checked);
+                syncState();
             });
-        }
+            }
 
-        checks.forEach(c => c.addEventListener('change', syncState));
+            checks.forEach(c => c.addEventListener('change', syncState));
 
-        if (bulkForm) {
+            if (bulkForm) {
             bulkForm.addEventListener('submit', function () {
-            bulkIds.value = selectedIds().join(',');
+                // Put selected IDs into the hidden input
+                bulkIds.value = selectedIds().join(',');
             });
-        }
+            }
 
-        syncState();
+            syncState();
         })();
-    </script>
-    BLADE;
+        </script>
+        BLADE;
     }
 
     /* ===========================

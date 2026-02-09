@@ -16,7 +16,7 @@ trait HandlesDeletes
      * - Do NOT typehint Illuminate\Database\Eloquent\Model here, because Laravel can't bind it.
      * - Resource routes pass {id} by default, so we accept $id and resolve via $this->modelClass.
      */
-    public function destroy($modelOrId)
+    public function performDestroy($modelOrId)
     {
         $model = $this->resolveModel($modelOrId);
 
