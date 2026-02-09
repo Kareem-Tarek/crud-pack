@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 {{REQUEST_IMPORT}}{{AUTH_IMPORT}}use App\Models\{{MODEL_CLASS}};
+use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\HandlesDeletes;
 
 class {{MODEL_CLASS}}Controller extends Controller
