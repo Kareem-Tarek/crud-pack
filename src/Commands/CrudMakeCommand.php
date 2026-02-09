@@ -4,6 +4,7 @@ namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class CrudMakeCommand extends Command
@@ -20,7 +21,7 @@ class CrudMakeCommand extends Command
         {--model : Generate Model}
         {--migration : Generate Migration}
         {--views : Generate Blade views (web only)}
-        {--policy? : Policy/authorization style: authorize|resource|gate|none (if passed without value, you will be prompted)}
+        {--policy= : Generate Policy + choose authorization style (authorize|resource|gate|none). If passed as --policy with no value, you will be prompted.}
         {--force : Overwrite existing files/blocks without prompting}
     ';
 
@@ -76,16 +77,12 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | --all exclusivity + Wizard
-         |
-         | NOTE:
-         | - We allow --all with --policy (because policy is “style selection”).
-         | - We DO NOT allow --all with explicit generator flags like --routes/--model/...
          =========================== */
         $allProvided = $this->optionWasProvided('all');
-        $anyExplicitGenerators = $this->anyGeneratorOptionWasProvided(); // excludes policy by design
+        $anyExplicitGenerators = $this->anyGeneratorOptionWasProvided();
 
         if ($allProvided && $anyExplicitGenerators) {
-            $this->error('Do not combine --all with explicit generator options (--routes/--request/--model/--migration/--views).');
+            $this->error('Do not combine --all with explicit generator options (--routes/--request/--model/--migration/--views) or policy styles.');
             return self::FAILURE;
         }
 
@@ -98,21 +95,19 @@ class CrudMakeCommand extends Command
             $this->input->setOption('migration', $this->confirm('Generate Migration?', false));
             $this->input->setOption('request', $this->confirm('Generate Request validation (single FormRequest)?', false));
 
+            $wantsPolicy = $this->confirm('Generate Policy + authorization?', false);
+            if ($wantsPolicy) {
+                // we mark policy as provided (value may still be null -> prompts later)
+                $this->input->setOption('policy', $this->option('policy')); // keep whatever was passed (usually null)
+                // note: we’ll resolve style later via resolvePolicyStyle()
+            } else {
+                $this->input->setOption('policy', 'none');
+            }
+
             if ($isWeb) {
                 $this->input->setOption('views', $this->confirm('Generate Blade views (Bootstrap 5)?', false));
             } else {
                 $this->input->setOption('views', false);
-            }
-
-            // Policy/authorization prompt (default: NO)
-            if (!$this->optionWasProvided('policy')) {
-                $enablePolicy = $this->confirm('Enable policy/authorization?', false);
-                if ($enablePolicy) {
-                    $style = $this->promptPolicyStyle(default: 'authorize');
-                    $this->input->setOption('policy', $style);
-                } else {
-                    $this->input->setOption('policy', 'none');
-                }
             }
         }
 
@@ -123,11 +118,9 @@ class CrudMakeCommand extends Command
             $this->input->setOption('model', true);
             $this->input->setOption('migration', true);
             $this->input->setOption('views', $isWeb); // never for api
-
-            // If --all and policy was not explicitly provided, always ask for policy style
+            // policy: prompt unless explicitly provided
             if (!$this->optionWasProvided('policy')) {
-                $style = $this->promptPolicyStyle(default: 'authorize');
-                $this->input->setOption('policy', $style);
+                $this->input->setOption('policy', null); // will prompt default authorize
             }
         }
 
@@ -138,52 +131,41 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | Derived naming (Laravel conventions)
+         | Derived naming
          =========================== */
         $modelClass = $name;
         $modelVar = Str::camel($name);
         $modelVarPlural = Str::camel(Str::pluralStudly($name));
         $table = Str::snake(Str::pluralStudly($name));
 
-        // URI is kebab-case plural (best practice)
+        // URI is kebab-case plural
         $uri = Str::kebab(Str::pluralStudly($name));
 
-        // Views folder can be snake_case plural
+        // Views folder snake_case plural
         $viewFolder = Str::snake(Str::pluralStudly($name));
 
-        /**
-         * IMPORTANT:
-         * Route::resource() route names are derived from the URI by default.
-         * For multi-word resources, URI becomes "product-categories", so route names are "product-categories.index".
-         * Therefore, routeName must match URI to avoid route-name mismatches in generated code.
-         */
+        // route name must match URI for multi-word resources
         $routeName = $uri;
 
         $force = (bool) $this->option('force');
 
-        $generateRoutes = (bool) $this->option('routes');
-        $generateRequest = (bool) $this->option('request');
-        $generateModel = (bool) $this->option('model');
+        $generateRoutes    = (bool) $this->option('routes');
+        $generateRequest   = (bool) $this->option('request');
+        $generateModel     = (bool) $this->option('model');
         $generateMigration = (bool) $this->option('migration');
-        $generateViews = (bool) $this->option('views');
+        $generateViews     = (bool) $this->option('views');
+
+        // Policy can be:
+        // - not requested
+        // - requested with a style: authorize|resource|gate|none
+        // - requested as --policy (no value) => prompt
+        $policyStyle = $this->resolvePolicyStyle($allProvided);
+        $generatePolicy = $policyStyle !== 'none';
 
         /* ===========================
-         | Policy style resolution
-         |
-         | Allowed: authorize | resource | gate | none
-         |
-         | Behavior requested:
-         | - --policy=VALUE => no prompt
-         | - --policy (no value) => prompt (default authorize)
-         | - --all without policy => prompt (default authorize)
-         | - if user “skips” => choose none
+         | 1) Ensure shared trait exists (WITH placeholder replacement)
          =========================== */
-        $policyStyle = $this->resolvePolicyStyleForRun($allProvided);
-
-        /* ===========================
-         | 1) Ensure shared trait exists
-         =========================== */
-        $this->ensureSharedTrait($force);
+        $this->ensureSharedTrait($soft, $force);
 
         /* ===========================
          | 2) Generate controller (always)
@@ -198,6 +180,7 @@ class CrudMakeCommand extends Command
             table: $table,
             viewFolder: $viewFolder,
             routeName: $routeName,
+            soft: $soft,
             force: $force
         );
 
@@ -205,7 +188,7 @@ class CrudMakeCommand extends Command
          | 3) Optional: Request
          =========================== */
         if ($generateRequest) {
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('requests/request.stub'),
                 target: app_path("Http/Requests/{$modelClass}Request.php"),
                 replacements: [
@@ -213,7 +196,8 @@ class CrudMakeCommand extends Command
                     '{{MODEL_VAR}}'   => $modelVar,
                     '{{TABLE}}'       => $table,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass}Request"
             );
         }
 
@@ -229,7 +213,7 @@ class CrudMakeCommand extends Command
                 ? "    use SoftDeletes;\n"
                 : "    // use SoftDeletes;\n";
 
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('models/model.stub'),
                 target: app_path("Models/{$modelClass}.php"),
                 replacements: [
@@ -237,67 +221,63 @@ class CrudMakeCommand extends Command
                     '{{SOFT_IMPORT}}' => $softImport,
                     '{{SOFT_USE}}'    => $softUse,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} model"
             );
         }
 
         /* ===========================
-         | 5) Optional: Migration (UNIQUE per table)
-         |
-         | Requirement:
-         | - Must NOT keep appending new migrations endlessly
-         | - If a migration for create_{table}_table already exists:
-         |     - without --force => prompt to replace
-         |     - with --force => replace without prompting
-         | - If not exists => create new (timestamped)
+         | 5) Optional: Migration (ONE per table; overwrite existing one)
          =========================== */
         if ($generateMigration) {
-            $existing = $this->findExistingCreateTableMigrationPath($table);
-
-            if ($existing && !$force) {
-                $replace = $this->confirm(
-                    "Migration already exists for [{$table}] (" . basename($existing) . "). Replace it?",
-                    false
-                );
-                if (!$replace) {
-                    $this->warn("Skipped migration for [{$table}].");
-                    // continue normally
-                    goto after_migration;
-                }
-            }
-
-            $target = $existing ?: database_path('migrations/' . now()->format('Y_m_d_His') . "_create_{$table}_table.php");
-
             $softColumn = $soft
                 ? "            \$table->softDeletes();\n"
                 : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
 
-            $this->generateFromStubWithPrompt(
-                stub: $this->stubPath('migrations/create_table.stub'),
-                target: $target,
-                replacements: [
-                    '{{TABLE}}'       => $table,
-                    '{{SOFT_COLUMN}}' => $softColumn,
-                ],
-                force: true // we already handled prompting above, so write directly
-            );
+            $existing = $this->findExistingMigrationForTable($table);
 
-            after_migration:
+            if ($existing) {
+                if (!$this->shouldOverwrite($existing, "Migration for {$table}", $force)) {
+                    $this->warn("Skipped migration overwrite for table [{$table}].");
+                } else {
+                    $this->generateFromStub(
+                        stub: $this->stubPath('migrations/create_table.stub'),
+                        target: $existing,
+                        replacements: [
+                            '{{TABLE}}'       => $table,
+                            '{{SOFT_COLUMN}}' => $softColumn,
+                        ],
+                        force: true,
+                        labelForPrompt: null
+                    );
+                }
+            } else {
+                $timestamp = now()->format('Y_m_d_His');
+                $filename = "{$timestamp}_create_{$table}_table.php";
+                $target = database_path("migrations/{$filename}");
+
+                $this->generateFromStub(
+                    stub: $this->stubPath('migrations/create_table.stub'),
+                    target: $target,
+                    replacements: [
+                        '{{TABLE}}'       => $table,
+                        '{{SOFT_COLUMN}}' => $softColumn,
+                    ],
+                    force: $force,
+                    labelForPrompt: "Migration for {$table}"
+                );
+            }
         }
 
         /* ===========================
-         | 6) Optional: Policy file generation
-         |
-         | - Only generate policy class when style is authorize/resource.
-         | - Gate style can be used without a policy file (optional), so we default to NOT generating it.
-         | - none => no policy file.
+         | 6) Optional: Policy
          =========================== */
-        if (in_array($policyStyle, ['authorize', 'resource'], true)) {
+        if ($generatePolicy) {
             $softPolicy = $soft
                 ? $this->policySoftMethodsActive($modelClass, $modelVar)
                 : $this->policySoftMethodsCommented($modelClass, $modelVar);
 
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('policies/policy.stub'),
                 target: app_path("Policies/{$modelClass}Policy.php"),
                 replacements: [
@@ -305,7 +285,8 @@ class CrudMakeCommand extends Command
                     '{{MODEL_VAR}}'           => $modelVar,
                     '{{SOFT_POLICY_METHODS}}' => $softPolicy,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass}Policy"
             );
         }
 
@@ -316,30 +297,27 @@ class CrudMakeCommand extends Command
             $viewsDir = resource_path("views/{$viewFolder}");
             $this->ensureDir($viewsDir);
 
-            // Deleted button: only active if soft-deletes; else blueprint comment
             $deletedButton = $soft
                 ? "      <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a>\n"
                 : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.deleted') }}\" class=\"btn btn-outline-danger\">Deleted</a> --}}\n";
 
-            // Bulk delete block
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
 
-            // index
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('views/index.stub'),
                 target: "{$viewsDir}/index.blade.php",
                 replacements: [
-                    '{{MODEL_CLASS}}'        => $modelClass,
-                    '{{MODEL_VAR_PLURAL}}'   => $modelVarPlural,
-                    '{{ROUTE_NAME}}'         => $routeName,
-                    '{{DELETED_BUTTON}}'     => $deletedButton,
-                    '{{BULK_DELETE_BLOCK}}'  => $bulkBlock,
+                    '{{MODEL_CLASS}}'       => $modelClass,
+                    '{{MODEL_VAR_PLURAL}}'  => $modelVarPlural,
+                    '{{ROUTE_NAME}}'        => $routeName,
+                    '{{DELETED_BUTTON}}'    => $deletedButton,
+                    '{{BULK_DELETE_BLOCK}}' => $bulkBlock,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} index view"
             );
 
-            // create/edit/show/_form
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('views/create.stub'),
                 target: "{$viewsDir}/create.blade.php",
                 replacements: [
@@ -348,10 +326,11 @@ class CrudMakeCommand extends Command
                     '{{ROUTE_NAME}}'  => $routeName,
                     '{{VIEW_FOLDER}}' => $viewFolder,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} create view"
             );
 
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('views/edit.stub'),
                 target: "{$viewsDir}/edit.blade.php",
                 replacements: [
@@ -360,10 +339,11 @@ class CrudMakeCommand extends Command
                     '{{ROUTE_NAME}}'  => $routeName,
                     '{{VIEW_FOLDER}}' => $viewFolder,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} edit view"
             );
 
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('views/show.stub'),
                 target: "{$viewsDir}/show.blade.php",
                 replacements: [
@@ -371,28 +351,30 @@ class CrudMakeCommand extends Command
                     '{{MODEL_VAR}}'   => $modelVar,
                     '{{ROUTE_NAME}}'  => $routeName,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} show view"
             );
 
-            $this->generateFromStubWithPrompt(
+            $this->generateFromStub(
                 stub: $this->stubPath('views/_form.stub'),
                 target: "{$viewsDir}/_form.blade.php",
                 replacements: [
                     '{{MODEL_VAR}}' => $modelVar,
                 ],
-                force: $force
+                force: $force,
+                labelForPrompt: "{$modelClass} form partial"
             );
 
-            // deleted view only generated when soft-deletes enabled
             if ($soft) {
-                $this->generateFromStubWithPrompt(
+                $this->generateFromStub(
                     stub: $this->stubPath('views/deleted.stub'),
                     target: "{$viewsDir}/deleted.blade.php",
                     replacements: [
                         '{{MODEL_CLASS}}' => $modelClass,
                         '{{ROUTE_NAME}}'  => $routeName,
                     ],
-                    force: $force
+                    force: $force,
+                    labelForPrompt: "{$modelClass} deleted view"
                 );
             }
         }
@@ -412,115 +394,176 @@ class CrudMakeCommand extends Command
             );
         }
 
-        $this->newLine();
         $this->info("Done. CRUD resource generated for [{$name}].");
-        $this->line("Policy/authorization style: <comment>{$policyStyle}</comment>");
-
-        if ($policyStyle === 'resource') {
-            $this->warn("Note: --policy=resource uses authorizeResource() (middleware-based). If your project doesn't support controller middleware(), use --policy=authorize or --policy=gate instead.");
-        }
-
         return self::SUCCESS;
     }
 
-    /* ===========================
-     | Policy option resolution
-     =========================== */
-    protected function resolvePolicyStyleForRun(bool $allProvided): string
+    /* ============================================================
+     | POLICY STYLE RESOLUTION
+     ============================================================ */
+
+    protected function resolvePolicyStyle(bool $allProvided): string
     {
-        $allowed = ['authorize', 'resource', 'gate', 'none'];
-
-        // Was --policy present on CLI at all?
-        $policyProvided = $this->optionWasProvided('policy');
-
-        // When --policy is present, Laravel returns:
-        // - string value when --policy=VALUE
-        // - null when --policy is passed without a value (because signature is --policy?)
-        $policyOpt = $this->option('policy');
-
-        if ($policyProvided && is_string($policyOpt) && $policyOpt !== '') {
-            $policyOpt = strtolower(trim($policyOpt));
-            if (!in_array($policyOpt, $allowed, true)) {
-                $this->error("Invalid --policy value [{$policyOpt}]. Allowed: authorize|resource|gate|none");
-                exit(self::FAILURE);
-            }
-            return $policyOpt;
-        }
-
-        if ($policyProvided && ($policyOpt === null || $policyOpt === '')) {
-            // --policy without value => prompt
-            return $this->promptPolicyStyle(default: 'authorize');
-        }
-
-        // If --all and policy not provided, we already prompted earlier (but keep safe fallback)
-        if ($allProvided) {
-            $opt = $this->option('policy');
-            if (is_string($opt) && $opt !== '' && in_array(strtolower($opt), $allowed, true)) {
-                return strtolower($opt);
-            }
-            return $this->promptPolicyStyle(default: 'authorize');
-        }
-
-        // If wizard set it, use it
-        $opt = $this->option('policy');
-        if (is_string($opt) && $opt !== '') {
-            $opt = strtolower(trim($opt));
-            if (in_array($opt, $allowed, true)) {
-                return $opt;
-            }
-        }
-
-        // Default: none (no policy)
-        return 'none';
-    }
-
-    protected function promptPolicyStyle(string $default = 'authorize'): string
-    {
-        $choices = ['authorize', 'resource', 'gate', 'none'];
-
-        $index = array_search($default, $choices, true);
-        if ($index === false) {
-            $index = 0;
-        }
-
-        $picked = $this->choice('Authorization style?', $choices, $index);
-
-        $picked = strtolower(trim((string) $picked));
-        if ($picked === '') {
+        // If policy option not provided AND not in --all => no policy by default
+        if (!$this->optionWasProvided('policy') && !$allProvided) {
             return 'none';
         }
 
-        return $picked;
+        $raw = $this->option('policy'); // may be null if passed as --policy with no value
+        $raw = is_string($raw) ? trim($raw) : $raw;
+
+        // If developer explicitly said none
+        if ($raw === 'none') {
+            return 'none';
+        }
+
+        // If value provided, validate it
+        if (is_string($raw) && $raw !== '') {
+            $style = strtolower($raw);
+            $allowed = ['authorize', 'resource', 'gate', 'none'];
+
+            if (!in_array($style, $allowed, true)) {
+                $this->warn("Unknown --policy value [{$raw}]. Allowed: authorize|resource|gate|none. Defaulting to authorize.");
+                return 'authorize';
+            }
+
+            return $style;
+        }
+
+        // Otherwise prompt (this happens for --policy with no value OR --all)
+        $choice = $this->choice(
+            'Policy authorization style?',
+            ['authorize', 'resource', 'gate', 'none'],
+            0 // default authorize
+        );
+
+        return strtolower($choice);
     }
 
-    /* ===========================
-     | Create shared trait once per app
-     =========================== */
-    protected function ensureSharedTrait(bool $force): void
+    /* ============================================================
+     | SHARED TRAIT (HandlesDeletes) with SOFT placeholder injection
+     ============================================================ */
+
+    protected function ensureSharedTrait(bool $soft, bool $force): void
     {
         $target = app_path('Http/Controllers/Concerns/HandlesDeletes.php');
 
         if ($this->files->exists($target) && !$force) {
-            // Do NOT overwrite silently. Ask.
-            $replace = $this->confirm("HandlesDeletes trait already exists. Replace it?", false);
+            $replace = $this->confirm("HandlesDeletes already exists. Replace it?", false);
             if (!$replace) {
-                $this->info('HandlesDeletes trait skipped.');
+                $this->info('HandlesDeletes trait exists — skipped.');
                 return;
             }
         }
 
-        // If --force => replace without prompting, or if user agreed
-        $this->generateFromStubWithPrompt(
+        $softMethods = $soft
+            ? $this->softTraitMethodsActive()
+            : $this->softTraitMethodsCommented();
+
+        $this->generateFromStub(
             stub: $this->stubPath('traits/HandlesDeletes.stub'),
             target: $target,
-            replacements: [],
-            force: true
+            replacements: [
+                '{{SOFT_TRAIT_METHODS}}' => $softMethods,
+            ],
+            force: true,
+            labelForPrompt: null
         );
     }
 
-    /* ===========================
-     | Controller Generation
-     =========================== */
+    protected function softTraitMethodsActive(): string
+    {
+        return <<<PHP
+
+    /**
+     * List soft-deleted records (explicit route).
+     */
+    public function deleted()
+    {
+        \$items = \$this->modelClass::onlyTrashed()->paginate(15);
+
+        if (request()->expectsJson()) {
+            return response()->json(\$items);
+        }
+
+        return view(\$this->viewFolder . '.deleted', compact('items'));
+    }
+
+    /**
+     * Restore single (explicit route).
+     */
+    public function restore(int|string \$id)
+    {
+        \$model = \$this->modelClass::onlyTrashed()->findOrFail(\$id);
+        \$model->restore();
+
+        return \$this->deleteResponse('Restored successfully.');
+    }
+
+    /**
+     * Restore bulk (explicit route).
+     */
+    public function restoreBulk(Request \$request)
+    {
+        \$ids = \$this->extractIds(\$request);
+
+        if (!empty(\$ids)) {
+            \$this->modelClass::onlyTrashed()->whereKey(\$ids)->restore();
+        }
+
+        return \$this->deleteResponse('Selected records restored.');
+    }
+
+    /**
+     * Force delete single (explicit route).
+     */
+    public function forceDelete(int|string \$id)
+    {
+        \$model = \$this->modelClass::onlyTrashed()->findOrFail(\$id);
+        \$model->forceDelete();
+
+        return \$this->deleteResponse('Permanently deleted.');
+    }
+
+    /**
+     * Force delete bulk (explicit route).
+     */
+    public function forceDeleteBulk(Request \$request)
+    {
+        \$ids = \$this->extractIds(\$request);
+
+        if (!empty(\$ids)) {
+            \$this->modelClass::onlyTrashed()->whereKey(\$ids)->forceDelete();
+        }
+
+        return \$this->deleteResponse('Selected records permanently deleted.');
+    }
+
+PHP;
+    }
+
+    protected function softTraitMethodsCommented(): string
+    {
+        $code = trim($this->softTraitMethodsActive(), "\n");
+        $lines = explode("\n", $code);
+
+        $out = [];
+        $out[] = "    // Soft Deletes disabled — uncomment after enabling SoftDeletes";
+        foreach ($lines as $line) {
+            $out[] = $line === '' ? '' : '    // ' . ltrim($line);
+        }
+
+        return implode("\n", $out) . "\n";
+    }
+
+    /* ============================================================
+     | CONTROLLER GENERATION
+     | NOTE: still uses stubs; policyStyle is passed via placeholders.
+     | Your controller stubs should support these placeholders:
+     | - {{AUTH_IMPORT}}, {{CLASS_TRAITS}}, {{CONSTRUCTOR}}
+     | - (optional) {{POLICY_STYLE}} if you want to branch in stub
+     ============================================================ */
+
     protected function generateController(
         bool $isWeb,
         bool $generateRequest,
@@ -531,11 +574,11 @@ class CrudMakeCommand extends Command
         string $table,
         string $viewFolder,
         string $routeName,
+        bool $soft,
         bool $force
     ): void {
         $stub = $isWeb ? 'controllers/web.controller.stub' : 'controllers/api.controller.stub';
 
-        // Request placeholders
         $requestImport = "use Illuminate\\Http\\Request;\n";
         $requestTypehint = 'Request';
         $requestData = '$request->all()';
@@ -546,52 +589,25 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
-        // Auth placeholders
+        // Policy placeholders (safe defaults)
         $authImport = '';
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
 
-        // Method-level authorization placeholders (require stubs to place them)
-        $authIndex = '';
-        $authCreate = '';
-        $authStore = '';
-        $authShow = '';
-        $authEdit = '';
-        $authUpdate = '';
-        $authDestroy = '';
-
-        if ($policyStyle === 'authorize') {
+        // policyStyle:
+        // - authorize => needs AuthorizesRequests (authorize() method), but NOT authorizeResource()
+        // - resource   => uses authorizeResource() (uses middleware internally)
+        // - gate       => uses Gate::authorize (no trait required)
+        // - none       => nothing
+        if ($policyStyle === 'authorize' || $policyStyle === 'resource') {
             $authImport = "use Illuminate\\Foundation\\Auth\\Access\\AuthorizesRequests;\n";
             $classTraits = "use AuthorizesRequests, HandlesDeletes;";
-
-            $authIndex   = "        \$this->authorize('viewAny', {$modelClass}::class);\n";
-            $authCreate  = "        \$this->authorize('create', {$modelClass}::class);\n";
-            $authStore   = "        \$this->authorize('create', {$modelClass}::class);\n";
-            $authShow    = "        \$this->authorize('view', \${$modelVar});\n";
-            $authEdit    = "        \$this->authorize('update', \${$modelVar});\n";
-            $authUpdate  = "        \$this->authorize('update', \${$modelVar});\n";
-            $authDestroy = "        \$this->authorize('delete', \${$modelVar});\n";
-        }
-
-        if ($policyStyle === 'gate') {
+        } elseif ($policyStyle === 'gate') {
             $authImport = "use Illuminate\\Support\\Facades\\Gate;\n";
             $classTraits = "use HandlesDeletes;";
-
-            $authIndex   = "        Gate::authorize('viewAny', {$modelClass}::class);\n";
-            $authCreate  = "        Gate::authorize('create', {$modelClass}::class);\n";
-            $authStore   = "        Gate::authorize('create', {$modelClass}::class);\n";
-            $authShow    = "        Gate::authorize('view', \${$modelVar});\n";
-            $authEdit    = "        Gate::authorize('update', \${$modelVar});\n";
-            $authUpdate  = "        Gate::authorize('update', \${$modelVar});\n";
-            $authDestroy = "        Gate::authorize('delete', \${$modelVar});\n";
         }
 
         if ($policyStyle === 'resource') {
-            // NOTE: authorizeResource() calls middleware() internally in Laravel.
-            // This may fail for projects that don't have controller middleware pipeline.
-            $authImport = "use Illuminate\\Foundation\\Auth\\Access\\AuthorizesRequests;\n";
-            $classTraits = "use AuthorizesRequests, HandlesDeletes;";
-
             $constructor = <<<PHP
 
     public function __construct()
@@ -606,42 +622,40 @@ PHP;
             ? app_path("Http/Controllers/{$modelClass}Controller.php")
             : app_path("Http/Controllers/Api/{$modelClass}Controller.php");
 
-        $this->generateFromStubWithPrompt(
+        $this->generateFromStub(
             stub: $this->stubPath($stub),
             target: $target,
             replacements: [
-                '{{MODEL_CLASS}}'       => $modelClass,
-                '{{MODEL_VAR}}'         => $modelVar,
-                '{{MODEL_VAR_PLURAL}}'  => $modelVarPlural,
-                '{{TABLE}}'             => $table,
-                '{{VIEW_FOLDER}}'       => $viewFolder,
-                '{{ROUTE_NAME}}'        => $routeName,
+                '{{MODEL_CLASS}}'      => $modelClass,
+                '{{MODEL_VAR}}'        => $modelVar,
+                '{{MODEL_VAR_PLURAL}}' => $modelVarPlural,
+                '{{TABLE}}'            => $table,
+                '{{VIEW_FOLDER}}'      => $viewFolder,
+                '{{ROUTE_NAME}}'       => $routeName,
 
-                '{{REQUEST_IMPORT}}'    => $requestImport,
-                '{{REQUEST_TYPEHINT}}'  => $requestTypehint,
-                '{{REQUEST_CLASS}}'     => $requestTypehint,
-                '{{REQUEST_DATA}}'      => $requestData,
+                '{{REQUEST_IMPORT}}'   => $requestImport,
+                '{{REQUEST_TYPEHINT}}' => $requestTypehint,
+                '{{REQUEST_DATA}}'     => $requestData,
 
-                '{{AUTH_IMPORT}}'       => $authImport,
-                '{{CLASS_TRAITS}}'      => $classTraits,
-                '{{CONSTRUCTOR}}'       => $constructor,
+                '{{AUTH_IMPORT}}'      => $authImport,
+                '{{CLASS_TRAITS}}'     => $classTraits,
+                '{{CONSTRUCTOR}}'      => $constructor,
 
-                // Optional method-level placeholders (your controller stubs should include these)
-                '{{AUTH_INDEX}}'        => $authIndex,
-                '{{AUTH_CREATE}}'       => $authCreate,
-                '{{AUTH_STORE}}'        => $authStore,
-                '{{AUTH_SHOW}}'         => $authShow,
-                '{{AUTH_EDIT}}'         => $authEdit,
-                '{{AUTH_UPDATE}}'       => $authUpdate,
-                '{{AUTH_DESTROY}}'      => $authDestroy,
+                // Optional: allows stubs to branch
+                '{{POLICY_STYLE}}'     => $policyStyle,
+
+                // Optional: allow you to comment out soft delete controller blocks in stubs if you want
+                '{{SOFT_DELETES}}'     => $soft ? '1' : '0',
             ],
-            force: $force
+            force: $force,
+            labelForPrompt: "{$modelClass} controller"
         );
     }
 
-    /* ===========================
-     | Routes Appending
-     =========================== */
+    /* ============================================================
+     | ROUTES APPENDING (order avoids conflicts)
+     ============================================================ */
+
     protected function appendRoutes(
         string $name,
         bool $isWeb,
@@ -657,10 +671,9 @@ PHP;
             ? "\\App\\Http\\Controllers\\{$modelClass}Controller::class"
             : "\\App\\Http\\Controllers\\Api\\{$modelClass}Controller::class";
 
-        // IMPORTANT: custom routes must be defined BEFORE resource routes to avoid conflicts
         $lines = [];
 
-        // Always include bulk delete
+        // 1) bulk delete first
         if ($isWeb) {
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('{$routeName}.destroyBulk');";
         } else {
@@ -669,7 +682,7 @@ PHP;
 
         $lines[] = "";
 
-        // Soft-delete routes
+        // 2) soft routes
         $softRoutes = [];
 
         if ($isWeb) {
@@ -699,7 +712,7 @@ PHP;
 
         $lines[] = "";
 
-        // Main resource route LAST
+        // 3) resource route last
         $main = $isWeb
             ? "Route::resource('{$uri}', {$controllerFqn});"
             : "Route::apiResource('{$uri}', {$controllerFqn});";
@@ -751,7 +764,6 @@ PHP;
             return $contents;
         }
 
-        // Insert right after the opening php tag
         if (preg_match('/^<\?php\s*/', $contents)) {
             return preg_replace(
                 '/^<\?php\s*/',
@@ -761,13 +773,13 @@ PHP;
             );
         }
 
-        // Fallback
         return "use Illuminate\\Support\\Facades\\Route;\n\n" . $contents;
     }
 
-    /* ===========================
-     | Policy helper blocks
-     =========================== */
+    /* ============================================================
+     | POLICY HELPERS
+     ============================================================ */
+
     protected function policySoftMethodsActive(string $modelClass, string $modelVar): string
     {
         return <<<PHP
@@ -788,174 +800,189 @@ PHP;
     {
         $code = $this->policySoftMethodsActive($modelClass, $modelVar);
         $lines = explode("\n", rtrim($code, "\n"));
-
         $out = [];
         $out[] = "    // Soft Deletes disabled: uncomment after enabling SoftDeletes";
         foreach ($lines as $line) {
             $out[] = $line === '' ? "" : "    // " . ltrim($line);
         }
         $out[] = "";
-
         return implode("\n", $out);
     }
 
-    /* ===========================
-     | View blocks for bulk delete
-     =========================== */
+    /* ============================================================
+     | VIEW BLOCK: bulk delete (no nested form bug)
+     ============================================================ */
+
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
     {
         return <<<BLADE
-        {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
-        <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
-        @csrf
-        @method('DELETE')
+{{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
+<form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
+  @csrf
+  @method('DELETE')
 
-        {{-- We'll submit selected IDs as a comma-separated string --}}
-        <input type="hidden" name="ids" id="bulkIds" value="">
+  {{-- We'll submit selected IDs as a comma-separated string --}}
+  <input type="hidden" name="ids" id="bulkIds" value="">
 
-        <div class="card">
-            <div class="card-body d-flex justify-content-between align-items-center">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="selectAll">
-                <label class="form-check-label" for="selectAll">Select All</label>
-            </div>
+  <div class="card">
+    <div class="card-body d-flex justify-content-between align-items-center">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="selectAll">
+        <label class="form-check-label" for="selectAll">Select All</label>
+      </div>
 
-            <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-                onclick="return confirm('Delete selected records?')">
-                Delete Selected
-            </button>
-            </div>
-        </div>
-        </form>
+      <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
+        onclick="return confirm('Delete selected records?')">
+        Delete Selected
+      </button>
+    </div>
+  </div>
+</form>
 
-        {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
-        <div class="card">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0 align-middle">
-            <thead>
-                <tr>
-                <th style="width:50px;"></th>
-                <th style="width:90px;">ID</th>
-                <th>Name</th>
-                <th style="width:260px;" class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse(\${$modelVarPlural} as \$item)
-                <tr>
-                    <td>
-                    <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
-                    </td>
-                    <td>{{ \$item->id }}</td>
-                    <td>{{ \$item->name ?? '-' }}</td>
-                    <td class="text-end">
-                    <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
-                    <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
+{{-- Table (no wrapping form; row actions can safely include their own forms) --}}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-striped table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:50px;"></th>
+          <th style="width:90px;">ID</th>
+          <th>Name</th>
+          <th style="width:260px;" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @forelse(\${$modelVarPlural} as \$item)
+          <tr>
+            <td>
+              <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
+            </td>
+            <td>{{ \$item->id }}</td>
+            <td>{{ \$item->name ?? '-' }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
+              <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
 
-                    {{-- Single delete: separate form (safe because table is NOT wrapped by bulk form) --}}
-                    <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-sm btn-outline-danger"
-                        onclick="return confirm('Delete?')">
-                        Delete
-                        </button>
-                    </form>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="4" class="text-center text-muted py-4">No records found.</td>
-                </tr>
-                @endforelse
-            </tbody>
-            </table>
-        </div>
-        </div>
+              {{-- Single delete: separate form (safe because table is NOT wrapped by bulk form) --}}
+              <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                  onclick="return confirm('Delete?')">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+        @empty
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">No records found.</td>
+          </tr>
+        @endforelse
+      </tbody>
+    </table>
+  </div>
+</div>
 
-        <script>
-        (function () {
-            const selectAll = document.getElementById('selectAll');
-            const checks = Array.from(document.querySelectorAll('.row-check'));
-            const bulkBtn = document.getElementById('bulkDeleteBtn');
-            const bulkIds = document.getElementById('bulkIds');
-            const bulkForm = document.getElementById('bulkDeleteForm');
+<script>
+(function () {
+  const selectAll = document.getElementById('selectAll');
+  const checks = Array.from(document.querySelectorAll('.row-check'));
+  const bulkBtn = document.getElementById('bulkDeleteBtn');
+  const bulkIds = document.getElementById('bulkIds');
+  const bulkForm = document.getElementById('bulkDeleteForm');
 
-            function selectedIds() {
-            return checks.filter(c => c.checked).map(c => c.value);
-            }
+  function selectedIds() {
+    return checks.filter(c => c.checked).map(c => c.value);
+  }
 
-            function syncState() {
-            const ids = selectedIds();
-            bulkBtn.disabled = ids.length === 0;
+  function syncState() {
+    const ids = selectedIds();
+    bulkBtn.disabled = ids.length === 0;
 
-            const allChecked = checks.length > 0 && ids.length === checks.length;
-            selectAll.checked = allChecked;
-            selectAll.indeterminate = ids.length > 0 && !allChecked;
-            }
+    const allChecked = checks.length > 0 && ids.length === checks.length;
+    selectAll.checked = allChecked;
+    selectAll.indeterminate = ids.length > 0 && !allChecked;
+  }
 
-            if (selectAll) {
-            selectAll.addEventListener('change', function () {
-                checks.forEach(c => c.checked = selectAll.checked);
-                syncState();
-            });
-            }
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      checks.forEach(c => c.checked = selectAll.checked);
+      syncState();
+    });
+  }
 
-            checks.forEach(c => c.addEventListener('change', syncState));
+  checks.forEach(c => c.addEventListener('change', syncState));
 
-            if (bulkForm) {
-            bulkForm.addEventListener('submit', function () {
-                bulkIds.value = selectedIds().join(',');
-            });
-            }
+  if (bulkForm) {
+    bulkForm.addEventListener('submit', function () {
+      bulkIds.value = selectedIds().join(',');
+    });
+  }
 
-            syncState();
-        })();
-        </script>
-        BLADE;
+  syncState();
+})();
+</script>
+BLADE;
     }
 
-    /* ===========================
-     | Migration helpers
-     =========================== */
-    protected function findExistingCreateTableMigrationPath(string $table): ?string
+    /* ============================================================
+     | MIGRATION lookup: find "*_create_{table}_table.php"
+     ============================================================ */
+
+    protected function findExistingMigrationForTable(string $table): ?string
     {
         $dir = database_path('migrations');
         if (!$this->files->isDirectory($dir)) {
             return null;
         }
 
-        $pattern = $dir . DIRECTORY_SEPARATOR . "*_create_{$table}_table.php";
-        $matches = glob($pattern) ?: [];
+        $files = $this->files->files($dir);
+        $needle = "_create_{$table}_table.php";
 
-        // If multiple exist (bad state), pick the first deterministically (sorted)
-        sort($matches);
+        foreach ($files as $file) {
+            $path = $file->getPathname();
+            if (Str::endsWith($path, $needle)) {
+                return $path;
+            }
+        }
 
-        return $matches[0] ?? null;
+        return null;
     }
 
-    /* ===========================
-     | Stub utilities
-     =========================== */
+    protected function shouldOverwrite(string $target, string $label, bool $force): bool
+    {
+        if ($force) {
+            return true;
+        }
+
+        return $this->confirm("{$label} already exists. Replace it?", false);
+    }
+
+    /* ============================================================
+     | STUB UTILITIES
+     ============================================================ */
+
     protected function stubPath(string $relative): string
     {
         return __DIR__ . '/../../stubs/' . $relative;
     }
 
-    /**
-     * Generate from stub with correct overwrite behavior:
-     * - if target exists and !--force => prompt
-     * - if --force => overwrite without prompt
-     */
-    protected function generateFromStubWithPrompt(string $stub, string $target, array $replacements, bool $force): void
-    {
+    protected function generateFromStub(
+        string $stub,
+        string $target,
+        array $replacements,
+        bool $force,
+        ?string $labelForPrompt = null
+    ): void {
         if (!$this->files->exists($stub)) {
             $this->error("Stub not found: {$stub}");
             return;
         }
 
         if ($this->files->exists($target) && !$force) {
-            $replace = $this->confirm("File exists: {$target}. Replace it?", false);
+            $label = $labelForPrompt ?: basename($target);
+            $replace = $this->confirm("{$label} already exists. Replace it?", false);
             if (!$replace) {
                 $this->warn("Skipped: {$target}");
                 return;
@@ -968,6 +995,11 @@ PHP;
 
         foreach ($replacements as $k => $v) {
             $content = str_replace($k, $v, $content);
+        }
+
+        // Guard: if any placeholders remain, warn loudly (prevents "{{SOFT_TRAIT_METHODS}}" bugs)
+        if (preg_match('/\{\{[A-Z0-9_\-]+\}\}/i', $content)) {
+            $this->warn("Warning: Unreplaced stub placeholders detected in " . basename($target) . ". Check your stub + replacements.");
         }
 
         $this->files->put($target, $content);
@@ -986,16 +1018,14 @@ PHP;
         return $this->input->hasParameterOption("--{$longOption}");
     }
 
-    /**
-     * Explicit generator options that are mutually exclusive with --all.
-     * (We intentionally exclude policy to allow --all + --policy.)
-     */
     protected function anyGeneratorOptionWasProvided(): bool
     {
+        // IMPORTANT: policy can be provided as --policy or --policy=style (counts as provided)
         return $this->optionWasProvided('routes')
             || $this->optionWasProvided('request')
             || $this->optionWasProvided('model')
             || $this->optionWasProvided('migration')
-            || $this->optionWasProvided('views');
+            || $this->optionWasProvided('views')
+            || $this->optionWasProvided('policy');
     }
 }
