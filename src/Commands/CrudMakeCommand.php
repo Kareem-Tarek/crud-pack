@@ -85,7 +85,7 @@ class CrudMakeCommand extends Command
             return self::FAILURE;
         }
 
-        // Wizard mode: if no --all and no generator options were provided
+        // Wizard mode
         if (!$allProvided && !$anyExplicitGenerators) {
             $this->info('No generation options provided. Answer the following prompts:');
 
@@ -102,24 +102,23 @@ class CrudMakeCommand extends Command
             }
         }
 
-        // Dynamic --all behavior
+        // Dynamic --all
         if ($allProvided) {
             $this->input->setOption('routes', true);
             $this->input->setOption('request', true);
             $this->input->setOption('model', true);
             $this->input->setOption('migration', true);
             $this->input->setOption('policy', true);
-            $this->input->setOption('views', $isWeb); // never for api
+            $this->input->setOption('views', $isWeb);
         }
 
-        // Invalid combinations
         if ($isApi && $this->option('views')) {
             $this->error('Views can only be generated for WEB controllers.');
             return self::FAILURE;
         }
 
         /* ===========================
-         | Derived naming (Laravel conventions)
+         | Derived naming
          =========================== */
         $modelClass = $name;
         $modelVar = Str::camel($name);
@@ -139,17 +138,17 @@ class CrudMakeCommand extends Command
         $generateViews = (bool) $this->option('views');
 
         /* ===========================
-         | Policy Style (IMPORTANT)
+         | Policy Style
          =========================== */
-        $policyStyle = $this->resolvePolicyStyle($generatePolicy, $force);
+        $policyStyle = $this->resolvePolicyStyle($generatePolicy);
 
         /* ===========================
          | 1) Ensure shared trait exists
          =========================== */
-        $this->ensureSharedTrait(force: $force, soft: $soft, policyStyle: $policyStyle);
+        $this->ensureSharedTrait(force: $force, soft: $soft);
 
         /* ===========================
-         | 2) Generate controller (always)
+         | 2) Controller (always)
          =========================== */
         $this->generateController(
             isWeb: $isWeb,
@@ -167,7 +166,7 @@ class CrudMakeCommand extends Command
         );
 
         /* ===========================
-         | 3) Optional: Request
+         | 3) Request
          =========================== */
         if ($generateRequest) {
             $this->generateFromStub(
@@ -184,7 +183,7 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | 4) Optional: Model
+         | 4) Model
          =========================== */
         if ($generateModel) {
             $softImport = $soft
@@ -209,7 +208,7 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | 5) Optional: Migration (UNIQUE)
+         | 5) Migration (UNIQUE)
          =========================== */
         if ($generateMigration) {
             $this->generateUniqueMigration(
@@ -220,7 +219,7 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | 6) Optional: Policy file
+         | 6) Policy file
          =========================== */
         if ($generatePolicy) {
             $softPolicy = $soft
@@ -241,15 +240,15 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | 7) Optional: Views (web only)
+         | 7) Views (web only)
          =========================== */
         if ($generateViews && $isWeb) {
             $viewsDir = resource_path("views/{$viewFolder}");
             $this->ensureDir($viewsDir);
 
             $deletedButton = $soft
-                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a>\n"
-                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a> --}}\n";
+                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a>\n"
+                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a> --}}\n";
 
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
 
@@ -330,7 +329,7 @@ class CrudMakeCommand extends Command
         }
 
         /* ===========================
-         | 8) Optional: Routes
+         | 8) Routes
          =========================== */
         if ($generateRoutes) {
             $this->appendRoutes(
@@ -344,6 +343,17 @@ class CrudMakeCommand extends Command
             );
         }
 
+        /* ===========================
+         | 9) Postman (API only)
+         =========================== */
+        if ($isApi) {
+            $this->upsertPostmanForResource(
+                resourceName: $name,
+                uri: $uri,
+                soft: $soft
+            );
+        }
+
         $this->info("Done. CRUD resource generated for [{$name}].");
         return self::SUCCESS;
     }
@@ -351,29 +361,22 @@ class CrudMakeCommand extends Command
     /* ============================================================
      | Policy Style resolution + prompting
      ============================================================ */
-    protected function resolvePolicyStyle(bool $generatePolicy, bool $force): string
+    protected function resolvePolicyStyle(bool $generatePolicy): string
     {
         $style = (string) ($this->option('policy-style') ?? '');
-
-        $style = trim($style);
-        if ($style !== '') {
-            $style = strtolower($style);
-        }
+        $style = strtolower(trim($style));
 
         $valid = ['none', 'authorize', 'gate', 'resource'];
 
-        // If user didn't ask for policy generation, force none
         if (!$generatePolicy) {
             return 'none';
         }
 
-        // If provided but invalid
         if ($style !== '' && !in_array($style, $valid, true)) {
-            $this->error('Invalid --policy-style. Allowed: none|authorize|gate|resource');
-            return 'none';
+            $this->warn('Invalid --policy-style. Allowed: none|authorize|gate|resource. Falling back to "authorize".');
+            return 'authorize';
         }
 
-        // If empty => prompt. Default = authorize.
         if ($style === '') {
             $choice = $this->choice(
                 'Policy authorization style?',
@@ -387,9 +390,9 @@ class CrudMakeCommand extends Command
     }
 
     /* ============================================================
-     | Trait generation (replaces {{SOFT_TRAIT_METHODS}})
+     | Trait generation
      ============================================================ */
-    protected function ensureSharedTrait(bool $force, bool $soft, string $policyStyle): void
+    protected function ensureSharedTrait(bool $force, bool $soft): void
     {
         $target = app_path('Http/Controllers/Concerns/HandlesDeletes.php');
 
@@ -402,8 +405,8 @@ class CrudMakeCommand extends Command
         }
 
         $softMethods = $soft
-            ? $this->softTraitMethodsActive($policyStyle)
-            : $this->softTraitMethodsCommented($policyStyle);
+            ? $this->softTraitMethodsActive()
+            : $this->softTraitMethodsCommented();
 
         $this->generateFromStub(
             stub: $this->stubPath('traits/HandlesDeletes.stub'),
@@ -417,7 +420,7 @@ class CrudMakeCommand extends Command
     }
 
     /* ============================================================
-     | Controller Generation (replaces {{AUTH_*}} ALWAYS)
+     | Controller Generation
      ============================================================ */
     protected function generateController(
         bool $isWeb,
@@ -445,12 +448,11 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
-        // Authorization imports/traits/constructor
+        // Authorization imports/traits/constructor (resource style only)
         $authImport = '';
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
 
-        // NOTE: only resource style uses authorizeResource() and requires middleware.
         if ($generatePolicy && $policyStyle === 'resource') {
             $authImport = "use Illuminate\\Foundation\\Auth\\Access\\AuthorizesRequests;\n";
             $classTraits = "use AuthorizesRequests, HandlesDeletes;";
@@ -465,7 +467,6 @@ class CrudMakeCommand extends Command
 PHP;
         }
 
-        // Per-method auth placeholders (authorize/gate/none/resource)
         $authRepl = $this->controllerAuthReplacements(
             policyStyle: $generatePolicy ? $policyStyle : 'none',
             modelClass: $modelClass,
@@ -486,9 +487,11 @@ PHP;
                 '{{TABLE}}'             => $table,
                 '{{VIEW_FOLDER}}'       => $viewFolder,
                 '{{ROUTE_NAME}}'        => $routeName,
+
                 '{{REQUEST_IMPORT}}'    => $requestImport,
                 '{{REQUEST_TYPEHINT}}'  => $requestTypehint,
                 '{{REQUEST_DATA}}'      => $requestData,
+
                 '{{AUTH_IMPORT}}'       => $authImport,
                 '{{CLASS_TRAITS}}'      => $classTraits,
                 '{{CONSTRUCTOR}}'       => $constructor,
@@ -500,7 +503,6 @@ PHP;
 
     protected function controllerAuthReplacements(string $policyStyle, string $modelClass, string $modelVar): array
     {
-        // Always replace placeholders (never leak into files)
         $empty = [
             '{{AUTH_INDEX}}'   => '',
             '{{AUTH_CREATE}}'  => '',
@@ -513,7 +515,7 @@ PHP;
 
         $policyStyle = strtolower(trim($policyStyle));
 
-        // resource style uses constructor authorizeResource, not per-method
+        // resource uses authorizeResource() in constructor only
         if ($policyStyle === 'none' || $policyStyle === 'resource') {
             return $empty;
         }
@@ -546,16 +548,18 @@ PHP;
     }
 
     /* ============================================================
-     | Migration (UNIQUE by table)
+     | Unique migration generator
      ============================================================ */
     protected function generateUniqueMigration(string $table, bool $soft, bool $force): void
     {
         $migrationsDir = database_path('migrations');
-
         $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*_create_{$table}_table.php";
         $existing = glob($pattern) ?: [];
 
-        // If exists, rewrite it (ask unless --force)
+        $softColumn = $soft
+            ? "            \$table->softDeletes();\n"
+            : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
+
         if (!empty($existing)) {
             $target = $existing[0];
 
@@ -567,16 +571,13 @@ PHP;
                 }
             }
 
-            $softColumn = $soft
-                ? "            \$table->softDeletes();\n"
-                : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
-
             $this->generateFromStub(
                 stub: $this->stubPath('migrations/create_table.stub'),
                 target: $target,
                 replacements: [
-                    '{{TABLE}}'       => $table,
+                    '{{TABLE}}' => $table,
                     '{{SOFT_MIGRATION_COLUMN}}' => $softColumn,
+                    '{{SOFT_COLUMN}}' => $softColumn,
                 ],
                 force: true,
                 askReplaceIfExists: false
@@ -585,20 +586,16 @@ PHP;
             return;
         }
 
-        // Otherwise create new one
         $timestamp = now()->format('Y_m_d_His');
         $filename = "{$timestamp}_create_{$table}_table.php";
         $target = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
-
-        $softColumn = $soft
-            ? "            \$table->softDeletes();\n"
-            : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
 
         $this->generateFromStub(
             stub: $this->stubPath('migrations/create_table.stub'),
             target: $target,
             replacements: [
-                '{{TABLE}}'       => $table,
+                '{{TABLE}}' => $table,
+                '{{SOFT_MIGRATION_COLUMN}}' => $softColumn,
                 '{{SOFT_COLUMN}}' => $softColumn,
             ],
             force: true,
@@ -607,7 +604,7 @@ PHP;
     }
 
     /* ============================================================
-     | Routes Appending (your existing logic)
+     | Routes (API includes /trash)
      ============================================================ */
     protected function appendRoutes(
         string $name,
@@ -761,36 +758,26 @@ PHP;
     }
 
     /* ============================================================
-     | Trait soft methods (active/commented)
+     | Trait soft methods
      ============================================================ */
-    protected function softTraitMethodsActive(string $policyStyle): string
+    protected function softTraitMethodsActive(): string
     {
-        // NOTE: We are NOT enforcing authorization inside the trait.
-        // Controllers handle auth per your chosen style.
         return <<<'PHP'
-    /**
-     * List soft-deleted records (explicit route) — soft deletes only.
-     */
     public function trash()
     {
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
         if (request()->expectsJson()) {
-            $items = $this->modelClass::onlyTrashed();
-
             return response()->json([
                 'total' => $trashedTotal,
-                'data'  => $items,
+                'data'  => $this->modelClass::onlyTrashed()->get(),
             ]);
         }
 
         return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
     }
 
-    /**
-     * Restore single (explicit route) — soft deletes only.
-     */
     public function restore(int|string $id)
     {
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
@@ -799,9 +786,6 @@ PHP;
         return $this->deleteResponse('Restored successfully.');
     }
 
-    /**
-     * Restore bulk (explicit route) — soft deletes only.
-     */
     public function restoreBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -813,9 +797,6 @@ PHP;
         return $this->deleteResponse('Selected records restored.');
     }
 
-    /**
-     * Force delete single (explicit route) — soft deletes only.
-     */
     public function forceDelete(int|string $id)
     {
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
@@ -824,9 +805,6 @@ PHP;
         return $this->deleteResponse('Permanently deleted.');
     }
 
-    /**
-     * Force delete bulk (explicit route) — soft deletes only.
-     */
     public function forceDeleteBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -840,9 +818,9 @@ PHP;
 PHP;
     }
 
-    protected function softTraitMethodsCommented(string $policyStyle): string
+    protected function softTraitMethodsCommented(): string
     {
-        $code = $this->softTraitMethodsActive($policyStyle);
+        $code = $this->softTraitMethodsActive();
         $lines = explode("\n", rtrim($code, "\n"));
 
         $out = [];
@@ -856,115 +834,263 @@ PHP;
     }
 
     /* ============================================================
-     | View blocks for bulk delete
+     | Bulk delete view block
      ============================================================ */
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
     {
         return <<<BLADE
-    {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
-    <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
-        @csrf
-        @method('DELETE')
+  {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
+  <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
+    @csrf
+    @method('DELETE')
 
-        <input type="hidden" name="ids" id="bulkIds" value="">
+    <input type="hidden" name="ids" id="bulkIds" value="">
 
-        <div class="card">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="selectAll">
-            <label class="form-check-label" for="selectAll">Select All</label>
-            </div>
-
-            <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-            onclick="return confirm('Delete selected records?')">
-            Move To Trash (Selected)
-            </button>
-        </div>
-        </div>
-    </form>
-
-    {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
     <div class="card">
-        <div class="table-responsive">
-        <table class="table table-striped table-hover mb-0 align-middle">
-            <thead>
-            <tr>
-                <th style="width:50px;"></th>
-                <th style="width:90px;">ID</th>
-                <th>Name</th>
-                <th style="width:260px;" class="text-end">Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse(\${$modelVarPlural} as \$item)
-                <tr>
-                <td>
-                    <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
-                </td>
-                <td>{{ \$item->id }}</td>
-                <td>{{ \$item->name ?? '-' }}</td>
-                <td class="text-end">
-                    <a class="btn btn-md btn-outline-dark" title="Show" href="{{ route('{$routeName}.show', \$item) }}"><i class='fa-solid fa-eye'></i></a>
-                    <a class="btn btn-md btn-outline-primary" title="edit" href="{{ route('{$routeName}.edit', \$item) }}"><i class='fa-solid fa-pen-to-square'></i></a>
-
-                    <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" title="Delete" class="btn btn-md btn-outline-danger"
-                        onclick="return confirm('Delete?')"><i class='fa-solid fa-trash'></i></button>
-                    </form>
-                </td>
-                </tr>
-            @empty
-                <tr>
-                <td colspan="4" class="text-center text-muted py-4">No records found.</td>
-                </tr>
-            @endforelse
-            </tbody>
-        </table>
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="selectAll">
+          <label class="form-check-label" for="selectAll">Select All</label>
         </div>
+
+        <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
+          onclick="return confirm('Delete selected records?')">
+          Delete Selected
+        </button>
+      </div>
     </div>
+  </form>
 
-    <script>
-        (function () {
-        const selectAll = document.getElementById('selectAll');
-        const checks = Array.from(document.querySelectorAll('.row-check'));
-        const bulkBtn = document.getElementById('bulkDeleteBtn');
-        const bulkIds = document.getElementById('bulkIds');
-        const bulkForm = document.getElementById('bulkDeleteForm');
+  {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th style="width:50px;"></th>
+            <th style="width:90px;">ID</th>
+            <th>Name</th>
+            <th style="width:260px;" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse(\${$modelVarPlural} as \$item)
+            <tr>
+              <td>
+                <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
+              </td>
+              <td>{{ \$item->id }}</td>
+              <td>{{ \$item->name ?? '-' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
+                <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
 
-        function selectedIds() {
-            return checks.filter(c => c.checked).map(c => c.value);
-        }
+                <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
+                  @csrf
+                  @method('DELETE')
+                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Delete?')">
+                    Delete
+                  </button>
+                </form>
+              </td>
+            </tr>
+          @empty
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">No records found.</td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-        function syncState() {
-            const ids = selectedIds();
-            bulkBtn.disabled = ids.length === 0;
+  <script>
+    (function () {
+      const selectAll = document.getElementById('selectAll');
+      const checks = Array.from(document.querySelectorAll('.row-check'));
+      const bulkBtn = document.getElementById('bulkDeleteBtn');
+      const bulkIds = document.getElementById('bulkIds');
+      const bulkForm = document.getElementById('bulkDeleteForm');
 
-            const allChecked = checks.length > 0 && ids.length === checks.length;
-            selectAll.checked = allChecked;
-            selectAll.indeterminate = ids.length > 0 && !allChecked;
-        }
+      function selectedIds() {
+        return checks.filter(c => c.checked).map(c => c.value);
+      }
 
-        if (selectAll) {
-            selectAll.addEventListener('change', function () {
-            checks.forEach(c => c.checked = selectAll.checked);
-            syncState();
-            });
-        }
+      function syncState() {
+        const ids = selectedIds();
+        bulkBtn.disabled = ids.length === 0;
 
-        checks.forEach(c => c.addEventListener('change', syncState));
+        const allChecked = checks.length > 0 && ids.length === checks.length;
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = ids.length > 0 && !allChecked;
+      }
 
-        if (bulkForm) {
-            bulkForm.addEventListener('submit', function () {
-            bulkIds.value = selectedIds().join(',');
-            });
-        }
+      if (selectAll) {
+        selectAll.addEventListener('change', function () {
+          checks.forEach(c => c.checked = selectAll.checked);
+          syncState();
+        });
+      }
 
-        syncState();
-        })();
-    </script>
+      checks.forEach(c => c.addEventListener('change', syncState));
+
+      if (bulkForm) {
+        bulkForm.addEventListener('submit', function () {
+          bulkIds.value = selectedIds().join(',');
+        });
+      }
+
+      syncState();
+    })();
+  </script>
 BLADE;
+    }
+
+    /* ============================================================
+     | Postman auto update for a single resource (API only)
+     ============================================================ */
+    protected function upsertPostmanForResource(string $resourceName, string $uri, bool $soft): void
+    {
+        $appName = (string) config('app.name', 'Laravel');
+        $path = base_path('postman/CrudPack.postman_collection.json');
+
+        $collection = $this->loadOrCreatePostmanCollection($appName, $path);
+
+        // Ensure top-level app folder exists
+        $appIndex = $this->findPostmanFolderIndex($collection['item'] ?? [], $appName);
+        if ($appIndex === null) {
+            $collection['item'][] = ['name' => $appName, 'item' => []];
+            $appIndex = count($collection['item']) - 1;
+        }
+
+        $collection['item'][$appIndex]['item'] = $collection['item'][$appIndex]['item'] ?? [];
+
+        $resourceFolder = $this->buildPostmanFolderForResource($resourceName, $uri, $soft);
+
+        $existing = $this->findPostmanFolderIndex($collection['item'][$appIndex]['item'], $resourceName);
+        if ($existing === null) {
+            $collection['item'][$appIndex]['item'][] = $resourceFolder;
+        } else {
+            $collection['item'][$appIndex]['item'][$existing] = $resourceFolder;
+        }
+
+        $this->ensureDir(dirname($path));
+        $this->files->put($path, json_encode($collection, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $this->info('✅ Postman collection updated for API resource: ' . $resourceName);
+    }
+
+    protected function loadOrCreatePostmanCollection(string $appName, string $path): array
+    {
+        if ($this->files->exists($path)) {
+            $json = json_decode($this->files->get($path), true);
+
+            if (is_array($json) && isset($json['info'], $json['item'])) {
+                $json['variable'] = $this->ensurePostmanVariables($json['variable'] ?? []);
+                return $json;
+            }
+        }
+
+        return [
+            'info' => [
+                'name' => 'CrudPack',
+                'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+            ],
+            'item' => [
+                [
+                    'name' => $appName,
+                    'item' => [],
+                ],
+            ],
+            'variable' => $this->ensurePostmanVariables([]),
+        ];
+    }
+
+    protected function ensurePostmanVariables(array $vars): array
+    {
+        $map = [];
+        foreach ($vars as $v) {
+            if (isset($v['key'])) {
+                $map[$v['key']] = $v;
+            }
+        }
+
+        $map['base_url'] = $map['base_url'] ?? ['key' => 'base_url', 'value' => 'http://localhost'];
+        $map['api_prefix'] = $map['api_prefix'] ?? ['key' => 'api_prefix', 'value' => 'api'];
+
+        return array_values($map);
+    }
+
+    protected function findPostmanFolderIndex(array $items, string $name): ?int
+    {
+        foreach ($items as $i => $it) {
+            if (isset($it['name']) && $it['name'] === $name && isset($it['item']) && is_array($it['item'])) {
+                return $i;
+            }
+        }
+        return null;
+    }
+
+    protected function buildPostmanFolderForResource(string $resourceName, string $uri, bool $soft): array
+    {
+        $items = [];
+
+        $items[] = $this->postmanRequest("GetAll{$resourceName}", 'GET', $this->postmanApiUrl($uri));
+        $items[] = $this->postmanRequest("Get{$resourceName}", 'GET', $this->postmanApiUrl("{$uri}/:id"));
+        $items[] = $this->postmanRequest("Store{$resourceName}", 'POST', $this->postmanApiUrl($uri), true);
+        $items[] = $this->postmanRequest("Update{$resourceName}", 'PUT', $this->postmanApiUrl("{$uri}/:id"), true);
+        $items[] = $this->postmanRequest("Destroy{$resourceName}", 'DELETE', $this->postmanApiUrl("{$uri}/:id"));
+
+        $items[] = $this->postmanRequest("Destroy{$resourceName}Bulk", 'DELETE', $this->postmanApiUrl("{$uri}/bulk"), true);
+
+        if ($soft) {
+            $items[] = $this->postmanRequest("Trash{$resourceName}", 'GET', $this->postmanApiUrl("{$uri}/trash"));
+            $items[] = $this->postmanRequest("Restore{$resourceName}", 'POST', $this->postmanApiUrl("{$uri}/:id/restore"));
+            $items[] = $this->postmanRequest("Restore{$resourceName}Bulk", 'POST', $this->postmanApiUrl("{$uri}/restore-bulk"), true);
+            $items[] = $this->postmanRequest("ForceDelete{$resourceName}", 'DELETE', $this->postmanApiUrl("{$uri}/:id/force"));
+            $items[] = $this->postmanRequest("ForceDelete{$resourceName}Bulk", 'DELETE', $this->postmanApiUrl("{$uri}/force-bulk"), true);
+        }
+
+        return [
+            'name' => $resourceName,
+            'description' => 'generated-by-crud-pack',
+            'item' => $items,
+        ];
+    }
+
+    protected function postmanRequest(string $name, string $method, string $url, bool $hasBody = false): array
+    {
+        $headers = [
+            ['key' => 'Accept', 'value' => 'application/json'],
+        ];
+
+        $request = [
+            'name' => $name,
+            'request' => [
+                'method' => strtoupper($method),
+                'header' => $headers,
+                'url' => $url,
+            ],
+        ];
+
+        if ($hasBody && in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            $request['request']['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
+            $request['request']['body'] = [
+                'mode' => 'raw',
+                'raw' => json_encode([
+                    'name' => 'Example',
+                    'ids' => '1,2,3',
+                ], JSON_PRETTY_PRINT),
+            ];
+        }
+
+        return $request;
+    }
+
+    protected function postmanApiUrl(string $path): string
+    {
+        return rtrim('{{base_url}}', '/') . '/' . trim('{{api_prefix}}', '/') . '/' . ltrim($path, '/');
     }
 
     /* ============================================================
@@ -1001,7 +1127,6 @@ BLADE;
         }
 
         $this->ensureDir(dirname($target));
-
         $content = $this->files->get($stub);
 
         foreach ($replacements as $k => $v) {
