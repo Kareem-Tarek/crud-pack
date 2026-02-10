@@ -141,10 +141,12 @@ class CrudMakeCommand extends Command
         /* ============================================================
          | Laravel 11+ API install support
          | If --api => ensure routes/api.php exists by running install:api.
-         | If it exists already => ask (unless --force).
+         | - If api.php missing => run install:api (NO --force)
+         | - If exists => prompt (default NO when pressing Enter)
+         | - Cleanup bootstrap/app.php duplicated api: entries
          ============================================================ */
         if ($isApi) {
-            $this->ensureApiRoutesInstalled(force: $force);
+            $this->ensureApiRoutesInstalled();
         }
 
         /* ===========================
@@ -260,7 +262,7 @@ class CrudMakeCommand extends Command
                 ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a>\n"
                 : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a> --}}\n";
 
-            // ✅ UPDATED: pass $soft so delete button icon + title become dynamic
+            // UPDATED: pass $soft so delete icon/title can be dynamic per soft delete mode
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
 
             $this->generateFromStub(
@@ -341,6 +343,10 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 8) Routes
+         | NOTE:
+         | - WEB routes go ONLY to routes/web.php
+         | - API routes go ONLY to routes/api.php
+         | - API route names are prefixed with "api." to avoid colliding with WEB route names
          =========================== */
         if ($generateRoutes) {
             $this->appendRoutes(
@@ -371,67 +377,135 @@ class CrudMakeCommand extends Command
 
     /* ============================================================
      | Ensure Laravel 11+ API scaffold exists (install:api)
+     | - If routes/api.php is missing: run install:api (NO --force)
+     | - If it exists: ask to run install:api (default is NO)
+     | - After running: cleanup bootstrap/app.php duplicated "api:" keys
      ============================================================ */
-    protected function ensureApiRoutesInstalled(bool $force): void
+    protected function ensureApiRoutesInstalled(): void
     {
         $apiRoutesPath = base_path('routes/api.php');
 
+        // Missing => MUST install so api routes make sense
         if (!$this->files->exists($apiRoutesPath)) {
             $this->info('routes/api.php not found. Running: php artisan install:api');
+            $this->runInstallApiCommand();
 
-            $this->runInstallApiCommand($force);
-
-            if (!$this->files->exists($apiRoutesPath)) {
+            if ($this->files->exists($apiRoutesPath)) {
+                $this->cleanupBootstrapAppRoutingApiKey();
+            } else {
                 $this->error('install:api finished but routes/api.php is still missing. API routes will not be appended.');
             }
 
             return;
         }
 
-        if (!$force) {
-            $reinstall = $this->confirm(
-                "routes/api.php already exists.\nRe-run `php artisan install:api`? (May overwrite API-related files)",
-                false
-            );
+        /**
+         * Exists => DO NOT run install:api automatically.
+         * Ask, and default to NO (press Enter => NO).
+         */
+        $reinstall = $this->confirm(
+            "routes/api.php already exists.\nRun `php artisan install:api` anyway? (Laravel will ask before overwriting)\nDefault: NO",
+            false
+        );
 
-            if (!$reinstall) {
-                return;
-            }
+        if (!$reinstall) {
+            return;
         }
 
-        $this->info('Running: php artisan install:api' . ($force ? ' --force' : ''));
-        $this->runInstallApiCommand($force);
+        $this->info('Running: php artisan install:api');
+        $this->runInstallApiCommand();
+        $this->cleanupBootstrapAppRoutingApiKey();
     }
 
-    protected function runInstallApiCommand(bool $force): void
+    protected function runInstallApiCommand(): void
     {
         try {
-            if ($force) {
-                Artisan::call('install:api', ['--force' => true]);
-            } else {
-                Artisan::call('install:api');
+            // Use $this->call() to preserve interactive prompts safely.
+            $this->call('install:api');
+        } catch (\Throwable $e) {
+            $this->error('Failed to run install:api: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Fix duplication like:
+     *   ->withRouting(
+     *      web: ...,
+     *      api: ...,
+     *      api: ...,
+     *   )
+     *
+     * Keeps the FIRST "api:" and removes subsequent duplicates
+     * ONLY inside the withRouting(...) block.
+     */
+    protected function cleanupBootstrapAppRoutingApiKey(): void
+    {
+        $path = base_path('bootstrap/app.php');
+
+        if (!$this->files->exists($path)) {
+            return;
+        }
+
+        $content = $this->files->get($path);
+
+        // fast exit
+        if (substr_count($content, "api: __DIR__.'/../routes/api.php'") <= 1) {
+            return;
+        }
+
+        $lines = preg_split("/\R/", $content);
+
+        $inWithRouting = false;
+        $apiSeen = false;
+        $out = [];
+
+        foreach ($lines as $line) {
+            // Enter withRouting(
+            if (!$inWithRouting && str_contains($line, '->withRouting(')) {
+                $inWithRouting = true;
+                $apiSeen = false; // reset per block
+                $out[] = $line;
+                continue;
             }
 
-            $out = trim(Artisan::output());
-            if ($out !== '') {
-                $this->line($out);
+            // Exit withRouting block when we hit the closing ");" line
+            if ($inWithRouting && preg_match('/^\s*\)\s*[,;]?\s*$/', $line)) {
+                $inWithRouting = false;
+                $out[] = $line;
+                continue;
             }
-        } catch (\Throwable $e) {
-            if ($force) {
-                try {
-                    Artisan::call('install:api');
-                    $out = trim(Artisan::output());
-                    if ($out !== '') {
-                        $this->line($out);
+
+            // If inside withRouting, drop duplicate api: lines
+            if ($inWithRouting) {
+                $isApiLine = (bool) preg_match(
+                    "/^\s*api\s*:\s*__DIR__\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
+                    $line
+                );
+
+                // more robust match (most common)
+                if (!$isApiLine && str_contains($line, "api: __DIR__.'/../routes/api.php'")) {
+                    $isApiLine = true;
+                }
+
+                if ($isApiLine) {
+                    if ($apiSeen) {
+                        // skip duplicate
+                        continue;
                     }
-                    return;
-                } catch (\Throwable $e2) {
-                    $this->error('Failed to run install:api: ' . $e2->getMessage());
-                    return;
+                    $apiSeen = true;
+                    $out[] = $line;
+                    continue;
                 }
             }
 
-            $this->error('Failed to run install:api: ' . $e->getMessage());
+            $out[] = $line;
+        }
+
+        $fixed = implode("\n", $out);
+
+        if ($fixed !== $content) {
+            $this->files->put($path, $fixed);
+            $this->warn("Fixed duplicated 'api:' routing entry in bootstrap/app.php");
         }
     }
 
@@ -525,6 +599,7 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
+        // Authorization imports/traits/constructor (resource style only)
         $authImport = '';
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
@@ -591,6 +666,7 @@ PHP;
 
         $policyStyle = strtolower(trim($policyStyle));
 
+        // resource uses authorizeResource() in constructor only
         if ($policyStyle === 'none' || $policyStyle === 'resource') {
             return $empty;
         }
@@ -701,6 +777,7 @@ PHP;
         if ($isWeb) {
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('{$routeName}.destroyBulk');";
         } else {
+            // name-prefixed to avoid collision with WEB routes
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
@@ -715,6 +792,7 @@ PHP;
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
             $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
         } else {
+            // name-prefixed to avoid collision with WEB routes
             $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('api.{$routeName}.trash');";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('api.{$routeName}.restore');";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('api.{$routeName}.restoreBulk');";
@@ -833,11 +911,14 @@ PHP;
     }
 
     /* ============================================================
-     | Trait soft methods
+     | Trait soft methods (UPDATED to match latest enhancement)
      ============================================================ */
     protected function softTraitMethodsActive(): string
     {
         return <<<'PHP'
+    /**
+     * List soft-deleted records (explicit route) — soft deletes only.
+     */
     public function trash()
     {
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
@@ -862,6 +943,9 @@ PHP;
         return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
     }
 
+    /**
+     * Restore single (explicit route) — soft deletes only.
+     */
     public function restore(int|string $id)
     {
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
@@ -878,6 +962,9 @@ PHP;
         return $this->deleteResponse('Restored successfully.');
     }
 
+    /**
+     * Restore bulk (explicit route) — soft deletes only.
+     */
     public function restoreBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -906,6 +993,9 @@ PHP;
         return $this->deleteResponse('Selected records restored.');
     }
 
+    /**
+     * Force delete single (explicit route) — soft deletes only.
+     */
     public function forceDelete(int|string $id)
     {
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
@@ -921,6 +1011,9 @@ PHP;
         return $this->deleteResponse('Permanently deleted.');
     }
 
+    /**
+     * Force delete bulk (explicit route) — soft deletes only.
+     */
     public function forceDeleteBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -967,17 +1060,14 @@ PHP;
     }
 
     /* ============================================================
-     | Bulk delete view block (UPDATED: icons + btn-md + dynamic delete icon/title)
+     | Bulk delete view block
+     | - Show/Edit buttons are btn-md + icons + title
+     | - Delete icon/title dynamic based on $soft
      ============================================================ */
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural, bool $soft): string
     {
-        $deleteIcon = $soft
-            ? "<i class='fa-solid fa-trash'></i>"
-            : "<i class='fa-solid fa-skull-crossbones'></i>";
-
-        $deleteTitle = $soft
-            ? "Move To Trash"
-            : "Permanently Delete";
+        $deleteIcon  = $soft ? "<i class='fa-solid fa-trash'></i>" : "<i class='fa-solid fa-skull-crossbones'></i>";
+        $deleteTitle = $soft ? "Move To Trash" : "Permanently Delete";
 
         return <<<BLADE
     {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
@@ -1277,6 +1367,7 @@ BLADE;
             $content = str_replace($k, $v, $content);
         }
 
+        // HARD FAIL if ANY {{PLACEHOLDER}} remains
         if (preg_match_all('/\{\{[A-Z0-9_]+\}\}/', $content, $m)) {
             $left = array_values(array_unique($m[0]));
             $this->error("Unreplaced placeholders in stub {$stub}: " . implode(', ', $left));
