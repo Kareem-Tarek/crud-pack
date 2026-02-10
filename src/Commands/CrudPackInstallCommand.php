@@ -10,7 +10,7 @@ class CrudPackInstallCommand extends Command
     protected $signature = 'crud:install
         {--force : Overwrite existing files without prompting}';
 
-    protected $description = 'Install CRUD Pack Bootstrap layout views (app, navigation, welcome).';
+    protected $description = 'Install CRUD Pack Bootstrap layout views (app, navigation, welcome) + publish Laravel pagination views + assets + config.';
 
     public function __construct(protected Filesystem $files)
     {
@@ -64,6 +64,25 @@ class CrudPackInstallCommand extends Command
 
             $this->files->copy($source, $target);
             $this->info("Installed: {$relative}");
+        }
+
+        // Publish Laravel pagination views (resources/views/vendor/pagination)
+        // Equivalent to: php artisan vendor:publish --tag=laravel-pagination
+        $this->newLine();
+        $this->info('Publishing Laravel pagination views...');
+
+        $params = ['--tag' => 'laravel-pagination'];
+        if ($force) {
+            $params['--force'] = true;
+        }
+
+        $exitCode = $this->call('vendor:publish', $params);
+
+        if ($exitCode !== self::SUCCESS) {
+            $this->warn('Pagination views publish returned a non-zero exit code. You can run it manually:');
+            $this->line('php artisan vendor:publish --tag=laravel-pagination' . ($force ? ' --force' : ''));
+        } else {
+            $this->info('Published: laravel-pagination');
         }
 
         $this->newLine();

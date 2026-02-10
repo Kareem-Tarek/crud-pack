@@ -904,13 +904,13 @@ PHP;
                 <td>{{ \$item->id }}</td>
                 <td>{{ \$item->name ?? '-' }}</td>
                 <td class="text-end">
-                    <a class="btn btn-md btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}"><i class='fa-solid fa-eye'></i></a>
-                    <a class="btn btn-md btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}"><i class='fa-solid fa-pen-to-square'></i></a>
+                    <a class="btn btn-md btn-outline-dark" title="Show" href="{{ route('{$routeName}.show', \$item) }}"><i class='fa-solid fa-eye'></i></a>
+                    <a class="btn btn-md btn-outline-primary" title="edit" href="{{ route('{$routeName}.edit', \$item) }}"><i class='fa-solid fa-pen-to-square'></i></a>
 
                     <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-md btn-outline-danger"
+                    <button type="submit" title="Delete" class="btn btn-md btn-outline-danger"
                         onclick="return confirm('Delete?')"><i class='fa-solid fa-trash'></i></button>
                     </form>
                 </td>

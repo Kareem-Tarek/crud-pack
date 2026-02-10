@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Form request (store + update)
   - Policy
   - Blade views (Web only)
+  - Blade ready pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
 - Shared delete-handling trait generated once per application
 - Soft delete workflows:
   - Trashed listing (partially deleted resources)
