@@ -93,7 +93,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">No trashed records.</td>
+              <td colspan="5" class="text-center text-muted py-4">No trashed records.</td>
             </tr>
           @endforelse
         </tbody>
