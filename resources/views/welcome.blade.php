@@ -9,18 +9,20 @@
 
                 $displayName = $u
                     ? ($u->name
-                        ?? $u->username
-                        ?? $u->user_name
-                        ?? $u->fname
-                        ?? $u->f_name
-                        ?? $u->first_name
+                        ?? $u->display_name ?? $u->displayName
+                        ?? $u->full_name ?? $u->fullname
+                        ?? $u->username ?? $u->user_name
+                        ?? $u->nick_name ?? $u->nickname ?? $u->nick
+                        ?? $u->first_name ?? $u->firstname ?? $u->firstName ?? $u->fname ?? $u->f_name
+                        ?? $u->email
                         ?? 'Devs')
                     : 'Devs';
 
-                $restoreCmd = 'php artisan crud:install --force';
+                $restoreCmdPrompt = 'php artisan crud:install';
+                $restoreCmdForce  = 'php artisan crud:install --force';
             @endphp
 
-            <h1 class="card-title">
+            <h1 class="card-title text-center text-lg-start">
                 Hey <span class="{{ auth()->check() ? 'text-primary' : '' }}">{{ $displayName }}</span> — Welcome Aboard 👋
             </h1>
             <hr/>
@@ -32,8 +34,8 @@
 
             {{-- Package name + description --}}
             <div class="mt-3">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="fw-semibold">Package name:</span>
+                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                    <span class="fw-semibold text-decoration-underline">Package name:</span>
                     <span class="badge text-bg-light border fs-6 fw-semibold">kareemtarek/crud-pack</span>
                 </div>
 
@@ -42,40 +44,65 @@
                     helping you ship admin panels faster with consistent routes, validation, and resource structure.
                 </p>
 
-                {{-- Important note --}}
+                {{-- Important note (responsive) --}}
                 <div class="crud-note mt-3 p-3 rounded border crud-note-border crud-note-bg">
-                    <div class="d-flex align-items-start gap-3">
-                        <div class="text-center crud-note-left">
-                            <span class="badge text-bg-info d-inline-flex align-items-center px-3 py-2 fs-6">
+                    {{-- column on mobile, row on sm+ --}}
+                    <div class="d-flex flex-column flex-sm-row gap-3 align-items-stretch">
+                        {{-- left side: keep the same look, but responsive --}}
+                        <div class="text-center crud-note-left d-flex flex-column">
+                            <span class="badge text-bg-info d-inline-flex align-items-center px-3 py-2 fs-6 justify-content-center">
                                 <i class="fa-solid fa-circle-exclamation me-2"></i> Heads up
                             </span>
 
-                            {{-- bigger flashing warning triangle --}}
-                            <div class="mt-2 crud-triangle" aria-hidden="true" title="Warning">
-                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            <div class="crud-triangle-wrap" aria-hidden="true" title="Warning">
+                                <i class="fa-solid fa-triangle-exclamation crud-triangle"></i>
                             </div>
                         </div>
 
+                        {{-- right side content --}}
                         <div class="fs-6">
                             <strong>Auth scaffolding can overwrite views.</strong>
                             If you install an auth package (Breeze / Jetstream / UI / etc.), it may replace the package’s
-                            pre-scaffolded Blade templates. If that happens, bring the
-                            <strong>kareemtarek/crud-pack</strong> scaffolding back with:
+                            pre-scaffolded Blade templates.
 
-                            <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
-                                <code id="crudRestoreCmd" class="px-2 py-1 rounded bg-dark text-light">{{ $restoreCmd }}</code>
+                            <div class="mt-2">
+                                <div class="text-muted small mb-2">
+                                    Prefer a safe run with a CLI prompt (so you can choose not to overwrite)?
+                                </div>
 
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
-                                        id="copyCrudCmdBtn"
-                                        data-copy-target="crudRestoreCmd"
-                                        title="Copy command">
-                                    <i class="fa-regular fa-copy me-1"></i> Copy
-                                </button>
+                                <div class="d-flex flex-column flex-md-row flex-wrap align-items-start align-items-md-center gap-2 mb-2">
+                                    <code id="crudRestoreCmdPrompt" class="px-2 py-1 rounded bg-dark text-light">{{ $restoreCmdPrompt }}</code>
 
-                                <span class="small text-success d-none" id="copyCrudCmdMsg">
-                                    <i class="fa-solid fa-check me-1"></i> Copied!
-                                </span>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                                            data-copy-target="crudRestoreCmdPrompt"
+                                            title="Copy command">
+                                        <i class="fa-regular fa-copy me-1"></i> Copy
+                                    </button>
+
+                                    <span class="small text-success d-none" id="copyCrudCmdPromptMsg">
+                                        <i class="fa-solid fa-check me-1"></i> Copied!
+                                    </span>
+                                </div>
+
+                                <div class="text-muted small mb-2">
+                                    If the views were overwritten and you want to restore the <strong>kareemtarek/crud-pack</strong> scaffolding:
+                                </div>
+
+                                <div class="d-flex flex-column flex-md-row flex-wrap align-items-start align-items-md-center gap-2">
+                                    <code id="crudRestoreCmdForce" class="px-2 py-1 rounded bg-dark text-light">{{ $restoreCmdForce }}</code>
+
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                                            data-copy-target="crudRestoreCmdForce"
+                                            title="Copy command">
+                                        <i class="fa-regular fa-copy me-1"></i> Copy
+                                    </button>
+
+                                    <span class="small text-success d-none" id="copyCrudCmdForceMsg">
+                                        <i class="fa-solid fa-check me-1"></i> Copied!
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -86,17 +113,19 @@
             <div class="mt-4">
                 <div class="fs-6 text-muted mb-2">Package links:</div>
 
-                <a href="https://github.com/Kareem-Tarek/crud-pack"
-                   class="btn btn-dark btn-md me-2"
-                   target="_blank" rel="noopener noreferrer">
-                    <i class="fa-brands fa-github me-1"></i> GitHub Repo
-                </a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="https://github.com/Kareem-Tarek/crud-pack"
+                       class="btn btn-dark btn-md"
+                       target="_blank" rel="noopener noreferrer">
+                        <i class="fa-brands fa-github me-1"></i> GitHub Repo
+                    </a>
 
-                <a href="https://packagist.org/packages/kareemtarek/crud-pack"
-                   class="btn btn-packagist btn-md"
-                   target="_blank" rel="noopener noreferrer">
-                    <i class="fa-solid fa-box me-1"></i> Packagist
-                </a>
+                    <a href="https://packagist.org/packages/kareemtarek/crud-pack"
+                       class="btn btn-packagist btn-md"
+                       target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-box me-1"></i> Packagist
+                    </a>
+                </div>
             </div>
 
             {{-- Author --}}
@@ -145,9 +174,44 @@
         border-color: rgba(13,202,240,.45) !important;
     }
 
-    /* Make the left block wide enough so the triangle "fits" under the badge */
+    /* Left block: fixed width on sm+, full width on xs */
     .crud-note-left{
-        width: 160px;
+        width: 100%;
+    }
+    @media (min-width: 576px){
+        .crud-note-left{
+            width: 160px;
+        }
+    }
+
+    /* Triangle area: centers triangle under badge. On mobile it becomes a neat block below badge. */
+    .crud-triangle-wrap{
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: .5rem;
+        min-height: 65px;
+    }
+
+    /* Triangle: a bit bigger, smooth flash */
+    .crud-triangle{
+        font-size: 3.5rem;
+        line-height: 1;
+        color: #f59f00;
+        animation: trianglePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes trianglePulse{
+        0%, 100%{
+            opacity: .55;
+            transform: scale(.98);
+            filter: drop-shadow(0 0 0 rgba(245,159,0,0));
+        }
+        50%{
+            opacity: 1;
+            transform: scale(1.07);
+            filter: drop-shadow(0 0 .45rem rgba(245,159,0,.35));
+        }
     }
 
     /* Attention glow for the note */
@@ -167,38 +231,6 @@
         }
     }
 
-    /* Bigger triangle + smooth flash */
-    .crud-triangle{
-        font-size: 2.1rem;
-        line-height: 1;
-        color: #f59f00;
-        animation: trianglePulse 1.6s ease-in-out infinite;
-    }
-    @keyframes trianglePulse{
-        0%, 100%{
-            opacity: .55;
-            transform: scale(.98);
-            filter: drop-shadow(0 0 0 rgba(245,159,0,0));
-        }
-        50%{
-            opacity: 1;
-            transform: scale(1.08);
-            filter: drop-shadow(0 0 .45rem rgba(245,159,0,.35));
-        }
-    }
-
-    /* Mobile: let it wrap nicely */
-    @media (max-width: 576px){
-        .crud-note-left{
-            width: auto;
-            text-align: left;
-        }
-        .crud-triangle{
-            display: inline-block;
-            margin-left: .25rem;
-        }
-    }
-
     /* Respect reduced motion */
     @media (prefers-reduced-motion: reduce){
         .crud-note{ animation: none; }
@@ -211,39 +243,41 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('copyCrudCmdBtn');
-    const msg = document.getElementById('copyCrudCmdMsg');
+    document.querySelectorAll('button[data-copy-target]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const targetId = btn.getAttribute('data-copy-target');
+            const el = document.getElementById(targetId);
+            if (!el) return;
 
-    if (!btn) return;
+            const text = el.textContent.trim();
 
-    btn.addEventListener('click', async () => {
-        const targetId = btn.getAttribute('data-copy-target');
-        const el = document.getElementById(targetId);
-        if (!el) return;
+            const msgId = targetId === 'crudRestoreCmdPrompt'
+                ? 'copyCrudCmdPromptMsg'
+                : 'copyCrudCmdForceMsg';
 
-        const text = el.textContent.trim();
+            const msg = document.getElementById(msgId);
 
-        try {
-            await navigator.clipboard.writeText(text);
+            try {
+                await navigator.clipboard.writeText(text);
 
-            msg?.classList.remove('d-none');
-            btn.classList.add('disabled');
+                msg?.classList.remove('d-none');
+                btn.classList.add('disabled');
 
-            setTimeout(() => {
-                msg?.classList.add('d-none');
-                btn.classList.remove('disabled');
-            }, 1500);
-        } catch (e) {
-            // Fallback: select text (works even when clipboard permission is blocked)
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
+                setTimeout(() => {
+                    msg?.classList.add('d-none');
+                    btn.classList.remove('disabled');
+                }, 1500);
+            } catch (e) {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
 
-            msg?.classList.remove('d-none');
-            setTimeout(() => msg?.classList.add('d-none'), 1500);
-        }
+                msg?.classList.remove('d-none');
+                setTimeout(() => msg?.classList.add('d-none'), 1500);
+            }
+        });
     });
 });
 </script>
