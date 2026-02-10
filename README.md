@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 --- -->
 
-## [0.1.5] - Initial Release
+## [0.1.0] - Initial Release
 
 ### Added
 - Single Artisan command `crud:make` for CRUD generation
@@ -191,6 +191,19 @@ php artisan crud:make Category --web --soft-deletes
 ```
 If either decision is missing, CRUD Pack will prompt the developer to choose.
 
+---
+### Publish the config file
+Publish the package config into your Laravel app:
+
+CRUD Pack ships with a default configuration file that controls things like the navbar CRUD resources dropdown (which resources appear, their labels/routes, and whether a resource shows a Trash link when Soft Deletes are enabled) in the resources\views\layouts\navigation.blade.php.
+
+To copy the config file into your Laravel app (so you can customize it), publish it using:
+```bash
+php artisan vendor:publish --tag=crud-pack-config
+```
+This will create:
+- ``` config/crud-pack.php ```
+After publishing, edit ``` config/crud-pack.php ``` to define your resources and menu behavior
 ---
 ## Optional Generators
 In addition to the controller (which is always generated), CRUD Pack can optionally generate:
