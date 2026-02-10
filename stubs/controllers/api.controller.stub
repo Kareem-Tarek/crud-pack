@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\HandlesDeletes;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
@@ -19,34 +21,96 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
         {{AUTH_INDEX}}
 
-        $data = {{MODEL_CLASS}}::query();
+        try {
+            $query = {{MODEL_CLASS}}::query();
 
-        return response()->json([
-            'totalCount' => $data->count(), 
-            'data'       => $data->items()
-        ]);
+            return response()->json([
+                'success'    => true,
+                'message'    => 'OK',
+                'totalCount' => $query->count(),
+                'data'       => $query->get(),
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch {{MODEL_CLASS}} list.',
+                'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)
     {
 {{AUTH_STORE}}
-        $item = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+        try {
+            $item = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
 
-        return response()->json($item, 201);
+            return response()->json([
+                'success' => true,
+                'message' => '{{MODEL_CLASS}} created successfully.',
+                'data'    => $item,
+            ], 201);
+        } catch (QueryException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Database error while creating {{MODEL_CLASS}}.',
+                'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 409);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create {{MODEL_CLASS}}.',
+                'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
 {{AUTH_SHOW}}
-        return response()->json(${{MODEL_VAR}});
+        return response()->json([
+            'success' => true,
+            'message' => 'OK',
+            'data'    => ${{MODEL_VAR}},
+        ], 200);
     }
 
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
 {{AUTH_UPDATE}}
-        ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+        try {
+            ${{MODEL_VAR}}->update({{REQUEST_DATA}});
 
-        return response()->json(${{MODEL_VAR}});
+            return response()->json([
+                'success' => true,
+                'message' => '{{MODEL_CLASS}} updated successfully.',
+                'data'    => ${{MODEL_VAR}},
+            ], 200);
+        } catch (QueryException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Database error while updating {{MODEL_CLASS}}.',
+                'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 409);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update {{MODEL_CLASS}}.',
+                'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})

@@ -31,7 +31,7 @@ class CrudPackTraitCommand extends Command
 
         $force = (bool) $this->option('force');
 
-        // Ensure directory exists (compatible with most Laravel versions)
+        // Ensure directory exists
         $dir = dirname($target);
         if (!$this->files->isDirectory($dir)) {
             $this->files->makeDirectory($dir, 0755, true);
@@ -67,7 +67,6 @@ class CrudPackTraitCommand extends Command
 
         $content = $this->files->get($stub);
 
-        // Replace SOFT_TRAIT_METHODS
         $softBlock = $soft
             ? $this->softTraitMethodsActive()
             : $this->softTraitMethodsCommented();
@@ -95,9 +94,6 @@ class CrudPackTraitCommand extends Command
         return dirname(__DIR__, 2) . '/stubs/' . $relative;
     }
 
-    /**
-     * Soft-delete methods (ACTIVE).
-     */
     protected function softTraitMethodsActive(): string
     {
         return <<<'PHP'
@@ -110,12 +106,19 @@ class CrudPackTraitCommand extends Command
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
         if (request()->expectsJson()) {
-            $items = $this->modelClass::onlyTrashed();
-
             return response()->json([
-                'total' => $trashedTotal,
-                'data'  => $items,
-            ]);
+                'success'      => true,
+                'message'      => 'OK',
+                'trashedTotal' => $trashedTotal,
+                'data'         => $items->items(),
+                'meta'         => [
+                    'current_page' => $items->currentPage(),
+                    'per_page'     => $items->perPage(),
+                    'last_page'    => $items->lastPage(),
+                    'from'         => $items->firstItem(),
+                    'to'           => $items->lastItem(),
+                ],
+            ], 200);
         }
 
         return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
@@ -129,6 +132,14 @@ class CrudPackTraitCommand extends Command
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->restore();
 
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Restored successfully.',
+                'data'    => $model,
+            ], 200);
+        }
+
         return $this->deleteResponse('Restored successfully.');
     }
 
@@ -139,8 +150,25 @@ class CrudPackTraitCommand extends Command
     {
         $ids = $this->extractIds($request);
 
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'       => true,
+                'message'       => 'Selected records restored.',
+                'restoredCount' => $count,
+            ], 200);
         }
 
         return $this->deleteResponse('Selected records restored.');
@@ -154,6 +182,13 @@ class CrudPackTraitCommand extends Command
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->forceDelete();
 
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Permanently deleted.',
+            ], 200);
+        }
+
         return $this->deleteResponse('Permanently deleted.');
     }
 
@@ -164,8 +199,25 @@ class CrudPackTraitCommand extends Command
     {
         $ids = $this->extractIds($request);
 
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Selected records permanently deleted.',
+                'deletedCount' => $count,
+            ], 200);
         }
 
         return $this->deleteResponse('Selected records permanently deleted.');
@@ -174,10 +226,6 @@ class CrudPackTraitCommand extends Command
 PHP;
     }
 
-    /**
-     * Soft-delete methods (COMMENTED).
-     * Keeps the code visible but disabled if soft deletes are not chosen.
-     */
     protected function softTraitMethodsCommented(): string
     {
         $code = $this->softTraitMethodsActive();

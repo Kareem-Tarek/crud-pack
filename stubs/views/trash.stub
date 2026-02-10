@@ -56,6 +56,7 @@
             <th style="width:50px;"></th>
             <th style="width:90px;">ID</th>
             <th>Name</th>
+            th>Deleted At</th>
             <th style="width:320px;" class="text-end">Actions</th>
           </tr>
         </thead>
@@ -67,6 +68,10 @@
               </td>
               <td>{{ $item->id }}</td>
               <td>{{ $item->name ?? '-' }}</td>
+                @php
+                    $tz = env('DISPLAY_TIMEZONE') ?: 'Africa/Cairo';
+                @endphp
+              <td>{{ $item->deleted_at?->timezone($tz)->format('d-m-Y | h:i A') ?? '' }}</td>
               <td class="text-end">
                 <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
                   @csrf

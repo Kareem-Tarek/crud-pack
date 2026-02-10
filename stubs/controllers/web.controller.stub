@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 {{AUTH_IMPORT}}
 use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Concerns\HandlesDeletes;
+use Illuminate\Database\QueryException;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
@@ -37,11 +38,23 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function store({{REQUEST_TYPEHINT}} $request)
     {
 {{AUTH_STORE}}
-        {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+        try {
+            {{MODEL_CLASS}}::create({{REQUEST_DATA}});
 
-        return redirect()
-            ->route('{{ROUTE_NAME}}.index')
-            ->with('success', '{{MODEL_CLASS}} created successfully.');
+            return redirect()
+                ->route('{{ROUTE_NAME}}.index')
+                ->with('success', '{{MODEL_CLASS}} created successfully.');
+        } catch (QueryException $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Database error while creating {{MODEL_CLASS}}.');
+        } catch (\Throwable $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Failed to create {{MODEL_CLASS}}.');
+        }
     }
 
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
@@ -59,11 +72,23 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})
     {
 {{AUTH_UPDATE}}
-        ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+        try {
+            ${{MODEL_VAR}}->update({{REQUEST_DATA}});
 
-        return redirect()
-            ->route('{{ROUTE_NAME}}.index')
-            ->with('success', '{{MODEL_CLASS}} updated successfully.');
+            return redirect()
+                ->route('{{ROUTE_NAME}}.index')
+                ->with('success', '{{MODEL_CLASS}} updated successfully.');
+        } catch (QueryException $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Database error while updating {{MODEL_CLASS}}.');
+        } catch (\Throwable $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Failed to update {{MODEL_CLASS}}.');
+        }
     }
 
     public function destroy({{MODEL_CLASS}} ${{MODEL_VAR}})

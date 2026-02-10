@@ -4,6 +4,7 @@ namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 
 class CrudMakeCommand extends Command
@@ -137,6 +138,15 @@ class CrudMakeCommand extends Command
         $generatePolicy = (bool) $this->option('policy');
         $generateViews = (bool) $this->option('views');
 
+        /* ============================================================
+         | Laravel 11+ API install support
+         | If --api => ensure routes/api.php exists by running install:api.
+         | If it exists already => ask (unless --force).
+         ============================================================ */
+        if ($isApi) {
+            $this->ensureApiRoutesInstalled(force: $force);
+        }
+
         /* ===========================
          | Policy Style
          =========================== */
@@ -247,10 +257,11 @@ class CrudMakeCommand extends Command
             $this->ensureDir($viewsDir);
 
             $deletedButton = $soft
-                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a>\n"
-                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\">Trash</a> --}}\n";
+                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a>\n"
+                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-outline-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a> --}}\n";
 
-            $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural);
+            // ✅ UPDATED: pass $soft so delete button icon + title become dynamic
+            $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
 
             $this->generateFromStub(
                 stub: $this->stubPath('views/index.stub'),
@@ -359,6 +370,72 @@ class CrudMakeCommand extends Command
     }
 
     /* ============================================================
+     | Ensure Laravel 11+ API scaffold exists (install:api)
+     ============================================================ */
+    protected function ensureApiRoutesInstalled(bool $force): void
+    {
+        $apiRoutesPath = base_path('routes/api.php');
+
+        if (!$this->files->exists($apiRoutesPath)) {
+            $this->info('routes/api.php not found. Running: php artisan install:api');
+
+            $this->runInstallApiCommand($force);
+
+            if (!$this->files->exists($apiRoutesPath)) {
+                $this->error('install:api finished but routes/api.php is still missing. API routes will not be appended.');
+            }
+
+            return;
+        }
+
+        if (!$force) {
+            $reinstall = $this->confirm(
+                "routes/api.php already exists.\nRe-run `php artisan install:api`? (May overwrite API-related files)",
+                false
+            );
+
+            if (!$reinstall) {
+                return;
+            }
+        }
+
+        $this->info('Running: php artisan install:api' . ($force ? ' --force' : ''));
+        $this->runInstallApiCommand($force);
+    }
+
+    protected function runInstallApiCommand(bool $force): void
+    {
+        try {
+            if ($force) {
+                Artisan::call('install:api', ['--force' => true]);
+            } else {
+                Artisan::call('install:api');
+            }
+
+            $out = trim(Artisan::output());
+            if ($out !== '') {
+                $this->line($out);
+            }
+        } catch (\Throwable $e) {
+            if ($force) {
+                try {
+                    Artisan::call('install:api');
+                    $out = trim(Artisan::output());
+                    if ($out !== '') {
+                        $this->line($out);
+                    }
+                    return;
+                } catch (\Throwable $e2) {
+                    $this->error('Failed to run install:api: ' . $e2->getMessage());
+                    return;
+                }
+            }
+
+            $this->error('Failed to run install:api: ' . $e->getMessage());
+        }
+    }
+
+    /* ============================================================
      | Policy Style resolution + prompting
      ============================================================ */
     protected function resolvePolicyStyle(bool $generatePolicy): string
@@ -448,7 +525,6 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
-        // Authorization imports/traits/constructor (resource style only)
         $authImport = '';
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
@@ -515,7 +591,6 @@ PHP;
 
         $policyStyle = strtolower(trim($policyStyle));
 
-        // resource uses authorizeResource() in constructor only
         if ($policyStyle === 'none' || $policyStyle === 'resource') {
             return $empty;
         }
@@ -604,7 +679,7 @@ PHP;
     }
 
     /* ============================================================
-     | Routes (API includes /trash)
+     | Routes
      ============================================================ */
     protected function appendRoutes(
         string $name,
@@ -626,7 +701,7 @@ PHP;
         if ($isWeb) {
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('{$routeName}.destroyBulk');";
         } else {
-            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk']);";
+            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
         $lines[] = "";
@@ -640,11 +715,11 @@ PHP;
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
             $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
         } else {
-            $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash']);";
-            $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore']);";
-            $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk']);";
-            $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete']);";
-            $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk']);";
+            $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('api.{$routeName}.trash');";
+            $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('api.{$routeName}.restore');";
+            $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('api.{$routeName}.restoreBulk');";
+            $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('api.{$routeName}.forceDelete');";
+            $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('api.{$routeName}.forceDeleteBulk');";
         }
 
         if ($soft) {
@@ -662,7 +737,7 @@ PHP;
 
         $main = $isWeb
             ? "Route::resource('{$uri}', {$controllerFqn});"
-            : "Route::apiResource('{$uri}', {$controllerFqn});";
+            : "Route::apiResource('{$uri}', {$controllerFqn})->names('api.{$routeName}');";
 
         $lines[] = $main;
 
@@ -770,9 +845,18 @@ PHP;
 
         if (request()->expectsJson()) {
             return response()->json([
-                'total' => $trashedTotal,
-                'data'  => $this->modelClass::onlyTrashed()->get(),
-            ]);
+                'success'      => true,
+                'message'      => 'OK',
+                'trashedTotal' => $trashedTotal,
+                'data'         => $items->items(),
+                'meta'         => [
+                    'current_page' => $items->currentPage(),
+                    'per_page'     => $items->perPage(),
+                    'last_page'    => $items->lastPage(),
+                    'from'         => $items->firstItem(),
+                    'to'           => $items->lastItem(),
+                ],
+            ], 200);
         }
 
         return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
@@ -783,6 +867,14 @@ PHP;
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->restore();
 
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Restored successfully.',
+                'data'    => $model,
+            ], 200);
+        }
+
         return $this->deleteResponse('Restored successfully.');
     }
 
@@ -790,8 +882,25 @@ PHP;
     {
         $ids = $this->extractIds($request);
 
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'       => true,
+                'message'       => 'Selected records restored.',
+                'restoredCount' => $count,
+            ], 200);
         }
 
         return $this->deleteResponse('Selected records restored.');
@@ -802,6 +911,13 @@ PHP;
         $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->forceDelete();
 
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Permanently deleted.',
+            ], 200);
+        }
+
         return $this->deleteResponse('Permanently deleted.');
     }
 
@@ -809,8 +925,25 @@ PHP;
     {
         $ids = $this->extractIds($request);
 
-        if (!empty($ids)) {
-            $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Selected records permanently deleted.',
+                'deletedCount' => $count,
+            ], 200);
         }
 
         return $this->deleteResponse('Selected records permanently deleted.');
@@ -834,116 +967,127 @@ PHP;
     }
 
     /* ============================================================
-     | Bulk delete view block
+     | Bulk delete view block (UPDATED: icons + btn-md + dynamic delete icon/title)
      ============================================================ */
-    protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural): string
+    protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural, bool $soft): string
     {
+        $deleteIcon = $soft
+            ? "<i class='fa-solid fa-trash'></i>"
+            : "<i class='fa-solid fa-skull-crossbones'></i>";
+
+        $deleteTitle = $soft
+            ? "Move To Trash"
+            : "Permanently Delete";
+
         return <<<BLADE
-  {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
-  <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
-    @csrf
-    @method('DELETE')
+    {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
+    <form id="bulkDeleteForm" method="POST" action="{{ route('{$routeName}.destroyBulk') }}" class="mb-3">
+        @csrf
+        @method('DELETE')
 
-    <input type="hidden" name="ids" id="bulkIds" value="">
+        <input type="hidden" name="ids" id="bulkIds" value="">
 
-    <div class="card">
-      <div class="card-body d-flex justify-content-between align-items-center">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="selectAll">
-          <label class="form-check-label" for="selectAll">Select All</label>
+        <div class="card">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="selectAll">
+            <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+
+            <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
+            onclick="return confirm('Move selected records to trash?')">
+            Move To Trash (Selected)
+            </button>
         </div>
+        </div>
+    </form>
 
-        <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-          onclick="return confirm('Delete selected records?')">
-          Delete Selected
-        </button>
-      </div>
-    </div>
-  </form>
-
-  {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
-  <div class="card">
-    <div class="table-responsive">
-      <table class="table table-striped table-hover mb-0 align-middle">
-        <thead>
-          <tr>
-            <th style="width:50px;"></th>
-            <th style="width:90px;">ID</th>
-            <th>Name</th>
-            <th style="width:260px;" class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse(\${$modelVarPlural} as \$item)
+    {{-- Table (no wrapping form; row actions can safely include their own forms) --}}
+    <div class="card">
+        <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0 align-middle">
+            <thead>
             <tr>
-              <td>
-                <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
-              </td>
-              <td>{{ \$item->id }}</td>
-              <td>{{ \$item->name ?? '-' }}</td>
-              <td class="text-end">
-                <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
-                <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
+                <th style="width:50px;"></th>
+                <th style="width:90px;">ID</th>
+                <th>Name</th>
+                <th style="width:260px;" class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @forelse(\${$modelVarPlural} as \$item)
+                <tr>
+                <td>
+                    <input class="form-check-input row-check" type="checkbox" value="{{ \$item->id }}">
+                </td>
+                <td>{{ \$item->id }}</td>
+                <td>{{ \$item->name ?? '-' }}</td>
+                <td class="text-end">
+                    <a class="btn btn-md btn-outline-dark" title="Show" href="{{ route('{$routeName}.show', \$item) }}">
+                        <i class='fa-solid fa-eye'></i>
+                    </a>
 
-                <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
-                  @csrf
-                  @method('DELETE')
-                  <button type="submit" class="btn btn-sm btn-outline-danger"
-                    onclick="return confirm('Delete?')">
-                    Delete
-                  </button>
-                </form>
-              </td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="4" class="text-center text-muted py-4">No records found.</td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
+                    <a class="btn btn-md btn-outline-primary" title="Edit" href="{{ route('{$routeName}.edit', \$item) }}">
+                        <i class='fa-solid fa-pen-to-square'></i>
+                    </a>
+
+                    <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" title="{$deleteTitle}" class="btn btn-md btn-outline-danger"
+                        onclick="return confirm('Delete?')">{$deleteIcon}</button>
+                    </form>
+                </td>
+                </tr>
+            @empty
+                <tr>
+                <td colspan="4" class="text-center text-muted py-4">No records found.</td>
+                </tr>
+            @endforelse
+            </tbody>
+        </table>
+        </div>
     </div>
-  </div>
 
-  <script>
-    (function () {
-      const selectAll = document.getElementById('selectAll');
-      const checks = Array.from(document.querySelectorAll('.row-check'));
-      const bulkBtn = document.getElementById('bulkDeleteBtn');
-      const bulkIds = document.getElementById('bulkIds');
-      const bulkForm = document.getElementById('bulkDeleteForm');
+    <script>
+        (function () {
+        const selectAll = document.getElementById('selectAll');
+        const checks = Array.from(document.querySelectorAll('.row-check'));
+        const bulkBtn = document.getElementById('bulkDeleteBtn');
+        const bulkIds = document.getElementById('bulkIds');
+        const bulkForm = document.getElementById('bulkDeleteForm');
 
-      function selectedIds() {
-        return checks.filter(c => c.checked).map(c => c.value);
-      }
+        function selectedIds() {
+            return checks.filter(c => c.checked).map(c => c.value);
+        }
 
-      function syncState() {
-        const ids = selectedIds();
-        bulkBtn.disabled = ids.length === 0;
+        function syncState() {
+            const ids = selectedIds();
+            bulkBtn.disabled = ids.length === 0;
 
-        const allChecked = checks.length > 0 && ids.length === checks.length;
-        selectAll.checked = allChecked;
-        selectAll.indeterminate = ids.length > 0 && !allChecked;
-      }
+            const allChecked = checks.length > 0 && ids.length === checks.length;
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = ids.length > 0 && !allChecked;
+        }
 
-      if (selectAll) {
-        selectAll.addEventListener('change', function () {
-          checks.forEach(c => c.checked = selectAll.checked);
-          syncState();
-        });
-      }
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+            checks.forEach(c => c.checked = selectAll.checked);
+            syncState();
+            });
+        }
 
-      checks.forEach(c => c.addEventListener('change', syncState));
+        checks.forEach(c => c.addEventListener('change', syncState));
 
-      if (bulkForm) {
-        bulkForm.addEventListener('submit', function () {
-          bulkIds.value = selectedIds().join(',');
-        });
-      }
+        if (bulkForm) {
+            bulkForm.addEventListener('submit', function () {
+            bulkIds.value = selectedIds().join(',');
+            });
+        }
 
-      syncState();
-    })();
-  </script>
+        syncState();
+        })();
+    </script>
 BLADE;
     }
 
@@ -1133,7 +1277,6 @@ BLADE;
             $content = str_replace($k, $v, $content);
         }
 
-        // HARD FAIL if ANY {{PLACEHOLDER}} remains
         if (preg_match_all('/\{\{[A-Z0-9_]+\}\}/', $content, $m)) {
             $left = array_values(array_unique($m[0]));
             $this->error("Unreplaced placeholders in stub {$stub}: " . implode(', ', $left));

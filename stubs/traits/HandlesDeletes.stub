@@ -78,7 +78,10 @@ trait HandlesDeletes
     protected function deleteResponse(string $message)
     {
         if (request()->expectsJson()) {
-            return response()->json(['message' => $message]);
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+            ], 200);
         }
 
         return redirect()->back()->with('success', $message);
