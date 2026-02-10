@@ -5,11 +5,11 @@
         </a>
 
         <button class="navbar-toggler" type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent"
-            aria-expanded="false"
-            aria-label="Toggle navigation">
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
 
@@ -50,23 +50,20 @@
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item"
-                                       href="{{ route($base . '.index') }}">
+                                    <a class="dropdown-item" href="{{ route($base . '.index') }}">
                                         List
                                     </a>
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item"
-                                       href="{{ route($base . '.create') }}">
+                                    <a class="dropdown-item" href="{{ route($base . '.create') }}">
                                         Create
                                     </a>
                                 </li>
 
                                 @if($soft)
                                     <li>
-                                        <a class="dropdown-item text-danger"
-                                           href="{{ route($base . '.trash') }}">
+                                        <a class="dropdown-item text-danger" href="{{ route($base . '.trash') }}">
                                             Trash
                                         </a>
                                     </li>
@@ -81,25 +78,54 @@
                 @endif
 
                 {{-- Auth example --}}
-                {{--
-                <li class="nav-item">
+                {{-- <li class="nav-item">
                     <a class="nav-link" href="{{ route('dashboard') }}">Dashboard</a>
-                </li>
-                --}}
+                </li> --}}
             </ul>
 
             <!-- Right Side -->
             <ul class="navbar-nav ms-auto">
                 {{-- Auth links --}}
-                {{--
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('login') }}">Login</a>
-                </li>
+                {{-- @guest
+                    @if (Route::has('login'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('login') }}">Login</a>
+                        </li>
+                    @endif
 
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('register') }}">Register</a>
-                </li>
-                --}}
+                    @if (Route::has('register'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('register') }}">Register</a>
+                        </li>
+                    @endif
+                @else
+                    <li class="nav-item dropdown">
+                        <a id="navbarUserDropdown"
+                           class="nav-link dropdown-toggle"
+                           href="#"
+                           role="button"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false">
+                            {{ Auth::user()->name ?? Auth::user()->email }}
+                        </a>
+
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarUserDropdown">
+                            <li>
+                                <a type="submit" class="btn dropdown-item" href="{{ Route::has('dashboard') ? route('dashboard') : route('home') }}">
+                                    {{ Route::has('dashboard') ? 'Dashboard' : 'Home' }}
+                                </a>
+                            </li>
+                            <li>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item">
+                                        Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                @endguest --}}
             </ul>
         </div>
     </div>
