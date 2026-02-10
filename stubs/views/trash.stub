@@ -70,7 +70,7 @@
               <td class="text-end">
                 <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
                   @csrf
-                  <button type="submit" title="Restore" class="btn btn-sm btn-outline-success"
+                  <button type="submit" title="Restore" class="btn btn-md btn-outline-success"
                     onclick="return confirm('Restore?')">
                     <i class='fa-solid fa-trash-arrow-up'></i>
                   </button>
@@ -79,7 +79,7 @@
                 <form method="POST" action="{{ route('{{ROUTE_NAME}}.forceDelete', $item->id) }}" class="d-inline">
                   @csrf
                   @method('DELETE')
-                  <button type="submit" title="Permanently delete" class="btn btn-sm btn-outline-danger"
+                  <button type="submit" title="Permanently delete" class="btn btn-md btn-outline-danger"
                     onclick="return confirm('Permanently delete?')">
                     <i class='fa-solid fa-skull-crossbones'></i>
                   </button>
