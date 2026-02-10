@@ -524,17 +524,17 @@ class CrudMakeCommand extends Command
         }
 
         if ($style !== '' && !in_array($style, $valid, true)) {
-            $this->warn('Invalid --policy-style. Allowed: none|authorize|gate|resource. Falling back to "authorize".');
-            return 'authorize';
+            $this->warn('Invalid --policy-style. Allowed: none|authorize|gate|resource. Falling back to "none".');
+            return 'none';
         }
 
         if ($style === '') {
             $choice = $this->choice(
                 'Policy authorization style?',
-                ['authorize', 'gate', 'resource', 'none'],
+                ['none', 'authorize', 'gate', 'resource'],
                 0
             );
-            return $choice ?: 'authorize';
+            return $choice ?: 'none';
         }
 
         return $style;

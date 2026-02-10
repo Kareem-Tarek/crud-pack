@@ -37,6 +37,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - This is the first stable release.
 - All generated code is intended to be edited and customized by developers.
 ---
+### Some considerations needs to be addressed:
+
+#### API scaffold safety for Laravel 11+
+- When generating ``` --api ``` resources, CrudPack ensures API routing is available (via Laravel’s ``` install:api ```) **only when needed**, and otherwise **asks the developer first** (default answer = **No**).
+
+Note: In **Laravel 11+**, the ``` routes/api.php ``` file (and API routing setup) is **not included** / **not registered by default** in a fresh install. It’s basically “optional scaffolding now.”
+
+#### Postman collection automation for API resources
+- When generating any ``` --api ``` resource, CrudPack creates ``` postman/CrudPack.postman_collection.json ``` if missing.
+- For additional ``` --api ``` resources, CrudPack updates (**upserts**) the same collection by adding/updating the resource folder — it **does not wipe/replace** unrelated content.
+
+#### ``` crud:postman ``` command
+- A dedicated command that generates/updates the Postman collection from **CRUDPACK blocks** in ``` routes/api.php ```.
+- Supports ``` --force ``` to rebuild **only CrudPack-generated folders** (safe rebuild).
+
+#### Index actions UI improvement (Web views)
+- In generated ``` index.blade.php ```, action buttons use:
+  - FontAwesome icons for **Show** and **Edit**
+  - ``` btn-md ``` instead of ``` btn-sm ```
+  - ``` title="..." ``` attributes for accessibility/UX
+- Delete button becomes dynamic based on soft deletes mode:
+  - Soft deletes enabled → **“Move To Trash”** behavior
+  - Soft deletes disabled → **“Permanently Delete”** behavior
+
+#### Default authorization shortcut
+- When ``` --policy ``` is enabled and ``` --policy-style ``` is not provided, the default behavior is ``` policy-style = none ``` (logic-first; no authorization wiring unless the developer chooses).
+
+Policy authorization styles (Note):
+- none
+- authorize
+- gate
+- resource
+
+## **These topics will already be discussed below ⬇️ later on!**
+---
 # ⬇️ Lets get started❗ ⬇️
 # CRUD Pack `(kareemtarek/crud-pack)`
 
@@ -218,11 +253,11 @@ In addition to the controller (which is always generated), CRUD Pack can optiona
 ---
 CRUD Pack provides a convenience shortcut:
 
-## The --policy-style= Shortcut (default "authorize")
-- --policy-style=authorize (adds use AuthorizesRequests and $this->authorize(...)) [default]
+## The --policy-style= Shortcut (default "none")
+- --policy-style=none (no policy is used) [default]
+- --policy-style=authorize (adds use AuthorizesRequests and $this->authorize(...))
 - --policy-style=gate (\Illuminate\Support\Facades\Gate::authorize(...))
 - --policy-style=resource (uses authorizeResource() but only if compatible)
-- --policy-style=none (no policy is used)
 ---
 ## The --all Shortcut
 ```bash

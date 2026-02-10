@@ -14,18 +14,18 @@ return [
     */
 
     'resources' => [
-        [
-            'label' => 'Products',
-            'route' => 'products',
-            'soft_deletes' => true,
+        // [
+        //     'label' => 'Products',
+        //     'route' => 'products',
+        //     'soft_deletes' => true,
             
-            // Optional override (defaults to "{resource}.trash" when soft_deletes=true)
-            // 'trash_route' => 'products.trash',
-        ],
-        [
-            'label' => 'Categories',
-            'route' => 'categories',
-            'soft_deletes' => false,
-        ],
+        //     // Optional override (defaults to "{resource}.trash" when soft_deletes=true)
+        //     // 'trash_route' => 'products.trash',
+        // ],
+        // [
+        //     'label' => 'Categories',
+        //     'route' => 'categories',
+        //     'soft_deletes' => false,
+        // ],
     ],
 ];
