@@ -14,13 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Support for Web and API controllers
 - Mandatory controller type and soft-delete mode selection
 - Optional generators:
-  - Routes
+  - Routes (web/api)
+    - For **api** routes: Ready API documentation Postman collection (.json) is being created (and also updated) when creating a new api resource. When the developer created another api resource then this api resource will be automatically appended to the created Postman collection (path: ``` postman/CrudPack.postman_collection.json ```)
   - Eloquent model
   - Migration
   - Form request (store + update)
   - Policy
   - Blade views (Web only)
-  - Blade ready pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
+  - Ready-blade pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
 - Shared delete-handling trait generated once per application
 - Soft delete workflows:
   - Trashed listing (partially deleted resources)
@@ -28,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Force delete (single & bulk)
 - Bulk delete support
 - Blueprint-first design (no hidden logic, no magic)
-- Bootstrap 5–based Blade views
+- Bootstrap 5–based Blade views (ready-blades with responsive design for the CRUD operations for any created resource with also a ready-logic within those blades UI/UX is handled)
 - Interactive wizard mode
 - Full Laravel naming convention compliance
 - Compatibility with PHP 8.0+ and Laravel 8.0+
