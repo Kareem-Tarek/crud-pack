@@ -11,7 +11,11 @@ class CrudPackServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Makes config('crudpack...') work even if user did NOT publish the file
+        $this->mergeConfigFrom(
+            dirname(__DIR__, 2) . '/config/crud-pack.php',
+            'crud-pack'
+        );
     }
 
     public function boot(): void
@@ -20,16 +24,21 @@ class CrudPackServiceProvider extends ServiceProvider
             return;
         }
 
-        // ✅ Register Artisan commands
+        // Register Artisan commands
         $this->commands([
             CrudMakeCommand::class,
             CrudPackInstallCommand::class,
             CrudPackTraitCommand::class
         ]);
 
-        // ✅ Allow vendor:publish for the package views
+        // Allow vendor:publish for the package views
         $this->publishes([
             dirname(__DIR__, 2) . '/resources/views' => resource_path('views'),
         ], 'crud-pack-views');
+
+        // Publish config
+        $this->publishes([
+            dirname(__DIR__, 2) . '/config/crud-pack.php' => config_path('crud-pack.php'),
+        ], 'crud-pack-config');
     }
 }

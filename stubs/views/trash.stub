@@ -13,7 +13,7 @@
     </div>
 
     <a href="{{ route('{{ROUTE_NAME}}.index') }}" class="btn btn-outline-secondary">
-      Back To {{MODEL_CLASS}} List
+      <i class='fa-solid fa-arrow-left'></i> Back To {{MODEL_CLASS}} List
     </a>
   </div>
 
@@ -31,11 +31,11 @@
 
       <div class="d-flex gap-2">
         <button type="button" class="btn btn-outline-success" id="bulkRestoreBtn" disabled>
-          Restore Selected
+          Restore (Selected)
         </button>
 
         <button type="button" class="btn btn-outline-danger" id="bulkForceBtn" disabled>
-          Force Delete Selected
+          Permanently Delete (Selected)
         </button>
       </div>
     </div>
@@ -70,18 +70,18 @@
               <td class="text-end">
                 <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
                   @csrf
-                  <button type="submit" class="btn btn-sm btn-outline-success"
+                  <button type="submit" title="Restore" class="btn btn-sm btn-outline-success"
                     onclick="return confirm('Restore?')">
-                    Restore
+                    <i class='fa-solid fa-trash-arrow-up'></i>
                   </button>
                 </form>
 
                 <form method="POST" action="{{ route('{{ROUTE_NAME}}.forceDelete', $item->id) }}" class="d-inline">
                   @csrf
                   @method('DELETE')
-                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                  <button type="submit" title="Permanently delete" class="btn btn-sm btn-outline-danger"
                     onclick="return confirm('Permanently delete?')">
-                    Force Delete
+                    <i class='fa-solid fa-skull-crossbones'></i>
                   </button>
                 </form>
               </td>

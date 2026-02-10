@@ -20,6 +20,66 @@
                     <a class="nav-link" href="{{ url('/') }}">Home</a>
                 </li>
 
+                @php
+                    $crudResources = config('crud-pack.resources', []);
+                @endphp
+
+                @if(!empty($crudResources))
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle"
+                           href="#"
+                           id="crudDropdown"
+                           role="button"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false">
+                            CRUD
+                        </a>
+
+                        <ul class="dropdown-menu" aria-labelledby="crudDropdown">
+                            @foreach($crudResources as $res)
+                                @php
+                                    $label = $res['label'] ?? 'Resource';
+                                    $base  = $res['route'] ?? null;
+                                    $soft  = (bool)($res['soft_deletes'] ?? false);
+                                @endphp
+
+                                @continue(!$base)
+
+                                <li>
+                                    <h6 class="dropdown-header">{{ $label }}</h6>
+                                </li>
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{{ route($base . '.index') }}">
+                                        List
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{{ route($base . '.create') }}">
+                                        Create
+                                    </a>
+                                </li>
+
+                                @if($soft)
+                                    <li>
+                                        <a class="dropdown-item text-danger"
+                                           href="{{ route($base . '.trash') }}">
+                                            Trash
+                                        </a>
+                                    </li>
+                                @endif
+
+                                @if(!$loop->last)
+                                    <li><hr class="dropdown-divider"></li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </li>
+                @endif
+
                 {{-- Auth example --}}
                 {{--
                 <li class="nav-item">

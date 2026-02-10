@@ -877,7 +877,7 @@ PHP;
 
             <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
             onclick="return confirm('Delete selected records?')">
-            Delete Selected
+            Move To Trash (Selected)
             </button>
         </div>
         </div>
@@ -904,8 +904,8 @@ PHP;
                 <td>{{ \$item->id }}</td>
                 <td>{{ \$item->name ?? '-' }}</td>
                 <td class="text-end">
-                    <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}">Show</a>
-                    <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}">Edit</a>
+                    <a class="btn btn-sm btn-outline-info" href="{{ route('{$routeName}.show', \$item) }}"><i class='fa-solid fa-eye'></i></a>
+                    <a class="btn btn-sm btn-outline-warning" href="{{ route('{$routeName}.edit', \$item) }}"><i class='fa-solid fa-pen-to-square'></i></a>
 
                     <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
                     @csrf
