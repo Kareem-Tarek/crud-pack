@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Form request (store + update)
   - Policy
   - Blade views (Web only)
+    - Added placeholder authentication section in ``` resources/views/layouts/navigation.blade.php ``` [including authenticated user and unauthenticated user (guest)]. They’re currently commented out to support projects without authentication. If authentication is later added (e.g., Breeze or Jetstream with Fortify, UI, custom authentication, etc.), you can simply uncomment them.
   - Ready-blade pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
 - Shared delete-handling trait generated once per application
 - Soft delete workflows:
