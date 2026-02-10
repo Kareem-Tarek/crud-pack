@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Mandatory controller type and soft-delete mode selection
 - Optional generators:
   - Routes (web/api)
-    - For **api** routes: Ready API documentation Postman collection (.json) is being created (and also updated) when creating a new api resource. When the developer created another api resource then this api resource will be automatically appended to the created Postman collection (path: ``` postman/CrudPack.postman_collection.json ```)
+    - For api routes (``` routes/api.php ```): Ready API documentation Postman collection (.json) is being created (and also updated) when creating a new api resource. When the developer created another api resource then this api resource will be automatically appended to the created Postman collection (path: ``` postman/CrudPack.postman_collection.json ```)
   - Eloquent model
   - Migration
   - Form request (store + update)
