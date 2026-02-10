@@ -62,7 +62,7 @@
                         {{-- right side content --}}
                         <div class="fs-6">
                             <strong>Auth scaffolding can overwrite views.</strong>
-                            If you install an auth package (Breeze / Jetstream / UI / etc.), it may replace the package’s
+                            If you install an auth package (Breeze or Jetstream with Fortify, UI, etc.), it may replace the package’s
                             pre-scaffolded Blade templates.
 
                             <div class="mt-2">
@@ -102,6 +102,18 @@
                                     <span class="small text-success d-none" id="copyCrudCmdForceMsg">
                                         <i class="fa-solid fa-check me-1"></i> Copied!
                                     </span>
+                                </div>
+
+                                <hr/>
+                                
+                                {{-- Auth placeholder note --}}
+                                <div class="alert alert-info mt-2 mb-0 py-2 px-3 small"> {{-- class="mt-2 small text-muted" --}}
+                                    <i class="fa-solid fa-circle-info me-1"></i>
+                                    If you have an authentication package installed, there’s a placeholder auth section in
+                                    <code class="px-1">resources/views/layouts/navigation.blade.php</code>
+                                    (for <strong>authenticated users</strong> and <strong>guests</strong>).
+                                    It’s currently commented out to support projects without authentication.
+                                    If you later add auth (Breeze or Jetstream with Fortify, UI, custom auth, etc.), simply uncomment it.
                                 </div>
                             </div>
                         </div>

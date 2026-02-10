@@ -24,12 +24,18 @@
   </div>
 
   <div class="mt-3 d-flex gap-2">
-    <a class="btn btn-lg btn-outline-primary" title="Edit" href="{{ route('{{ROUTE_NAME}}.edit', ${{MODEL_VAR}}) }}"><i class='fa-solid fa-pen-to-square'></i></a>
+    <a class="btn btn-lg btn-outline-primary" title="Edit" href="{{ route('{{ROUTE_NAME}}.edit', ${{MODEL_VAR}}) }}">
+      <i class='fa-solid fa-pen-to-square'></i>
+    </a>
 
     <form method="POST" action="{{ route('{{ROUTE_NAME}}.destroy', ${{MODEL_VAR}}) }}">
       @csrf
       @method('DELETE')
-      <button class="btn btn-lg btn-outline-danger" title="Delete" onclick="return confirm('Delete?')"><i class='fa-solid fa-trash'></i></button>
+      <button class="btn btn-lg btn-outline-danger"
+              title="{{DELETE_TITLE}}"
+              onclick="{{DELETE_CONFIRM}}">
+        {{DELETE_ICON}}
+      </button>
     </form>
   </div>
 </div>

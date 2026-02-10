@@ -4,7 +4,6 @@ namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 
 class CrudMakeCommand extends Command
@@ -262,7 +261,7 @@ class CrudMakeCommand extends Command
                 ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a>\n"
                 : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a> --}}\n";
 
-            // UPDATED: pass $soft so delete icon/title can be dynamic per soft delete mode
+            // Bulk block is dynamic based on $soft
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
 
             $this->generateFromStub(
@@ -305,13 +304,27 @@ class CrudMakeCommand extends Command
                 askReplaceIfExists: true
             );
 
+            // ✅ NEW: show delete button becomes dynamic (trash vs skull + title + confirm)
+            $showDeleteIcon = $soft
+                ? "<i class='fa-solid fa-trash'></i>"
+                : "<i class='fa-solid fa-skull-crossbones'></i>";
+
+            $showDeleteTitle = $soft ? "Move To Trash" : "Permanently Delete";
+
+            $showDeleteConfirm = $soft
+                ? "return confirm('Move to trash?')"
+                : "return confirm('Permanently delete? This cannot be undone.')";
+
             $this->generateFromStub(
                 stub: $this->stubPath('views/show.stub'),
                 target: "{$viewsDir}/show.blade.php",
                 replacements: [
-                    '{{MODEL_CLASS}}' => $modelClass,
-                    '{{MODEL_VAR}}'   => $modelVar,
-                    '{{ROUTE_NAME}}'  => $routeName,
+                    '{{MODEL_CLASS}}'    => $modelClass,
+                    '{{MODEL_VAR}}'      => $modelVar,
+                    '{{ROUTE_NAME}}'     => $routeName,
+                    '{{DELETE_ICON}}'    => $showDeleteIcon,
+                    '{{DELETE_TITLE}}'   => $showDeleteTitle,
+                    '{{DELETE_CONFIRM}}' => $showDeleteConfirm,
                 ],
                 force: $force,
                 askReplaceIfExists: true
@@ -777,7 +790,6 @@ PHP;
         if ($isWeb) {
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('{$routeName}.destroyBulk');";
         } else {
-            // name-prefixed to avoid collision with WEB routes
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
@@ -792,7 +804,6 @@ PHP;
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";
             $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
         } else {
-            // name-prefixed to avoid collision with WEB routes
             $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('api.{$routeName}.trash');";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('api.{$routeName}.restore');";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('api.{$routeName}.restoreBulk');";
@@ -911,7 +922,7 @@ PHP;
     }
 
     /* ============================================================
-     | Trait soft methods (UPDATED to match latest enhancement)
+     | Trait soft methods
      ============================================================ */
     protected function softTraitMethodsActive(): string
     {
@@ -1060,14 +1071,18 @@ PHP;
     }
 
     /* ============================================================
-     | Bulk delete view block
-     | - Show/Edit buttons are btn-md + icons + title
-     | - Delete icon/title dynamic based on $soft
+     | Bulk delete view block (dynamic confirm + label)
      ============================================================ */
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural, bool $soft): string
     {
         $deleteIcon  = $soft ? "<i class='fa-solid fa-trash'></i>" : "<i class='fa-solid fa-skull-crossbones'></i>";
         $deleteTitle = $soft ? "Move To Trash" : "Permanently Delete";
+
+        $bulkConfirm = $soft
+            ? "return confirm('Move selected records to trash?')"
+            : "return confirm('Permanently delete selected records? This cannot be undone.')";
+
+        $bulkLabel = $soft ? "Move To Trash (Selected)" : "Permanently Delete (Selected)";
 
         return <<<BLADE
     {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
@@ -1085,8 +1100,8 @@ PHP;
             </div>
 
             <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
-            onclick="return confirm('Move selected records to trash?')">
-            Move To Trash (Selected)
+            onclick="{$bulkConfirm}">
+            {$bulkLabel}
             </button>
         </div>
         </div>

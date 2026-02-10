@@ -55,13 +55,10 @@ Note: In **Laravel 11+**, the ``` routes/api.php ``` file (and API routing setup
 - Supports ``` --force ``` to rebuild **only CrudPack-generated folders** (safe rebuild).
 
 #### Index actions UI improvement (Web views)
-- In generated ``` index.blade.php ```, action buttons use:
-  - FontAwesome icons for **Show** and **Edit**
-  - ``` btn-md ``` instead of ``` btn-sm ```
-  - ``` title="..." ``` attributes for accessibility/UX
-- Delete button becomes dynamic based on soft deletes mode:
-  - Soft deletes enabled → **“Move To Trash”** behavior
-  - Soft deletes disabled → **“Permanently Delete”** behavior
+- In generated ``` index.blade.php ``` and ``` show.blade.php ```
+  - Delete button becomes dynamic based on soft deletes mode:
+    - Soft deletes enabled → **“Move To Trash”** behavior
+    - Soft deletes disabled → **“Permanently Delete”** behavior
 
 #### Default authorization shortcut
 - When ``` --policy ``` is enabled and ``` --policy-style ``` is not provided, the default behavior is ``` policy-style = none ``` (logic-first; no authorization wiring unless the developer chooses).
