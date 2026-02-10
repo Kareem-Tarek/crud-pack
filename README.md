@@ -195,7 +195,7 @@ If either decision is missing, CRUD Pack will prompt the developer to choose.
 ### Publish the config file
 Publish the package config into your Laravel app:
 
-CRUD Pack ships with a default configuration file that controls things like the navbar CRUD resources dropdown (which resources appear, their labels/routes, and whether a resource shows a Trash link when Soft Deletes are enabled) in the resources\views\layouts\navigation.blade.php.
+CRUD Pack ships with a default configuration file that controls things like the navbar CRUD resources dropdown (which resources appear, their labels/routes, and whether a resource shows a Trash link when Soft Deletes are enabled) in the **resources\views\layouts\navigation.blade.php**.
 
 To copy the config file into your Laravel app (so you can customize it), publish it using:
 ```bash
