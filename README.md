@@ -109,7 +109,7 @@ It generates a **complete, real-world CRUD blueprint** that:
 
 - Follows Laravel conventions strictly
 - Handles real application needs (soft deletes, bulk actions, restore flows)
-- Keeps all logic explicit and visible
+- Keeps all logic explicit and visible (commented & uncommented components)
 - Encourages customization instead of hiding behavior
 - Handles many operations dynamically through CLI (interactive wizard mode)
 - Supports full-stack features (MVC web) and also back-end (api)
