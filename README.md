@@ -178,11 +178,6 @@ The resource name is the foundation of everything CRUD Pack generates and must s
 - Must be StudlyCase
 - Must NOT include suffixes like Controller, Model, Request, etc.
 
-- **Valid examples:** 
-  - Department
-  - Product
-  - Car
-
 ### Valid Examples ✅
 ```bash
 php artisan crud:make Category
