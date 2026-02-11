@@ -1,5 +1,35 @@
 @extends('layouts.app')
 
+@push('styles')
+<style>
+  .flash-alert{
+    position: relative;
+    padding-inline-end: 3rem;
+  }
+  .flash-alert .close-x{
+    position: absolute;
+    top: .35rem;
+    z-index: 2;
+
+    background: transparent !important;
+    border: 0 !important;
+    padding: .25rem .4rem;
+    line-height: 1;
+    font-size: 1.25rem;
+    font-weight: 700;
+
+    color: #7a0d0d;
+    opacity: .95;
+    cursor: pointer;
+  }
+  .flash-alert .close-x:hover{ opacity: 1; }
+  .flash-alert .close-x:focus{ outline: none; box-shadow: none; }
+
+  .flash-alert.is-ltr .close-x{ right: .5rem; }
+  .flash-alert.is-rtl .close-x{ left: .5rem; }
+</style>
+@endpush
+
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -8,7 +38,16 @@
   </div>
 
   @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
+    @php $isAr = app()->isLocale('ar'); @endphp
+    <div class="alert alert-success alert-dismissible fade show flash-alert {{ $isAr ? 'is-rtl' : 'is-ltr' }}" role="alert">
+      {{ session('success') }}
+
+      <button type="button"
+              class="close-x"
+              aria-label="Close"
+              data-bs-dismiss="alert">×</button>
+      {{-- BS4: change data-bs-dismiss to data-dismiss --}}
+    </div>
   @endif
 
   <div class="card">

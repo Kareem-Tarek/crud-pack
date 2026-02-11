@@ -1,5 +1,104 @@
 @extends('layouts.app')
 
+@push('styles')
+<style>
+    /* Packagist-like button */
+    .btn-packagist{
+        --pk: #f28d1a;
+        --pk-focus: rgba(242,141,26,.35);
+
+        background-color: transparent;
+        border: 1px solid var(--pk);
+        color: var(--pk);
+        font-weight: 600;
+        transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out, transform .05s ease-in-out;
+    }
+    .btn-packagist:hover{
+        background-color: var(--pk);
+        border-color: var(--pk);
+        color: #fff;
+        transform: translateY(-1px);
+    }
+    .btn-packagist:active{ transform: translateY(0); }
+    .btn-packagist:focus,
+    .btn-packagist:focus-visible{
+        box-shadow: 0 0 0 .25rem var(--pk-focus);
+    }
+
+    /* Subtle custom note colors */
+    .crud-note-bg{
+        background: linear-gradient(90deg, rgba(13,202,240,.14), rgba(13,110,253,.06));
+    }
+    .crud-note-border{
+        border-color: rgba(13,202,240,.45) !important;
+    }
+
+    /* Left block: fixed width on sm+, full width on xs */
+    .crud-note-left{
+        width: 100%;
+    }
+    @media (min-width: 576px){
+        .crud-note-left{
+            width: 160px;
+        }
+    }
+
+    /* Triangle area: centers triangle under badge. On mobile it becomes a neat block below badge. */
+    .crud-triangle-wrap{
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: .5rem;
+        min-height: 65px;
+    }
+
+    /* Triangle: a bit bigger, smooth flash */
+    .crud-triangle{
+        font-size: 3.5rem;
+        line-height: 1;
+        color: #f59f00;
+        animation: trianglePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes trianglePulse{
+        0%, 100%{
+            opacity: .55;
+            transform: scale(.98);
+            filter: drop-shadow(0 0 0 rgba(245,159,0,0));
+        }
+        50%{
+            opacity: 1;
+            transform: scale(1.07);
+            filter: drop-shadow(0 0 .45rem rgba(245,159,0,.35));
+        }
+    }
+
+    /* Attention glow for the note */
+    .crud-note{
+        animation: crudGlow 2.2s ease-in-out infinite;
+    }
+    @keyframes crudGlow{
+        0%, 100%{
+            box-shadow: 0 0 0 0 rgba(13,202,240,.0);
+            filter: brightness(1);
+            transform: translateY(0);
+        }
+        50%{
+            box-shadow: 0 0 0 .40rem rgba(13,202,240,.16);
+            filter: brightness(1.06);
+            transform: translateY(-1px);
+        }
+    }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce){
+        .crud-note{ animation: none; }
+        .crud-triangle{ animation: none; }
+        .btn-packagist{ transition: none; }
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="container">
     <div class="card">
@@ -152,105 +251,6 @@
     </div>
 </div>
 @endsection
-
-@push('styles')
-<style>
-    /* Packagist-like button */
-    .btn-packagist{
-        --pk: #f28d1a;
-        --pk-focus: rgba(242,141,26,.35);
-
-        background-color: transparent;
-        border: 1px solid var(--pk);
-        color: var(--pk);
-        font-weight: 600;
-        transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out, transform .05s ease-in-out;
-    }
-    .btn-packagist:hover{
-        background-color: var(--pk);
-        border-color: var(--pk);
-        color: #fff;
-        transform: translateY(-1px);
-    }
-    .btn-packagist:active{ transform: translateY(0); }
-    .btn-packagist:focus,
-    .btn-packagist:focus-visible{
-        box-shadow: 0 0 0 .25rem var(--pk-focus);
-    }
-
-    /* Subtle custom note colors */
-    .crud-note-bg{
-        background: linear-gradient(90deg, rgba(13,202,240,.14), rgba(13,110,253,.06));
-    }
-    .crud-note-border{
-        border-color: rgba(13,202,240,.45) !important;
-    }
-
-    /* Left block: fixed width on sm+, full width on xs */
-    .crud-note-left{
-        width: 100%;
-    }
-    @media (min-width: 576px){
-        .crud-note-left{
-            width: 160px;
-        }
-    }
-
-    /* Triangle area: centers triangle under badge. On mobile it becomes a neat block below badge. */
-    .crud-triangle-wrap{
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-top: .5rem;
-        min-height: 65px;
-    }
-
-    /* Triangle: a bit bigger, smooth flash */
-    .crud-triangle{
-        font-size: 3.5rem;
-        line-height: 1;
-        color: #f59f00;
-        animation: trianglePulse 1.6s ease-in-out infinite;
-    }
-    @keyframes trianglePulse{
-        0%, 100%{
-            opacity: .55;
-            transform: scale(.98);
-            filter: drop-shadow(0 0 0 rgba(245,159,0,0));
-        }
-        50%{
-            opacity: 1;
-            transform: scale(1.07);
-            filter: drop-shadow(0 0 .45rem rgba(245,159,0,.35));
-        }
-    }
-
-    /* Attention glow for the note */
-    .crud-note{
-        animation: crudGlow 2.2s ease-in-out infinite;
-    }
-    @keyframes crudGlow{
-        0%, 100%{
-            box-shadow: 0 0 0 0 rgba(13,202,240,.0);
-            filter: brightness(1);
-            transform: translateY(0);
-        }
-        50%{
-            box-shadow: 0 0 0 .40rem rgba(13,202,240,.16);
-            filter: brightness(1.06);
-            transform: translateY(-1px);
-        }
-    }
-
-    /* Respect reduced motion */
-    @media (prefers-reduced-motion: reduce){
-        .crud-note{ animation: none; }
-        .crud-triangle{ animation: none; }
-        .btn-packagist{ transition: none; }
-    }
-</style>
-@endpush
 
 @push('scripts')
 <script>
