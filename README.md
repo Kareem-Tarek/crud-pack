@@ -308,12 +308,12 @@ CRUD Pack uses **one shared delete-handling trait** across the entire applicatio
 app/Http/Controllers/Concerns/HandlesDeletes.php
 ```
 
-### To create (if not existing)/replace (if existing) the HandlesDeletes.php trait with prompting [for any updates made from the package, and if you want to recreate the file to pull the updated logic] + including soft-delete methods (uncommented)
+### To create (if not existing)/replace (if existing) the HandlesDeletes.php trait with prompting [and that is for any updates made from the package, and if you want to recreate the file to pull the updated logic] + including soft-delete methods (**uncommented**)
 ```bash
 php artisan crud:trait --soft-deletes
 ```
 
-### Same as above (``` php artisan crud:trait --soft-deletes ```), except the soft-delete methods are included but left commented out (ready to enable if needed).
+### Same as above (``` php artisan crud:trait --soft-deletes ```), except the soft-delete methods are included but left **commented out** (ready to enable if needed).
 ```bash
 php artisan crud:trait --no-soft-deletes
 ```
