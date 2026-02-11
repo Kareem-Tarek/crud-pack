@@ -194,6 +194,11 @@ php artisan crud:make category
 php artisan crud:make product_categories
 
 ```
+**Note:** 
+- If you entered "category" instead of "Category", that will also generate it correctly (as "Category") everywhere in the project with the name conventions in Laravel
+- Also, if you entered "product_category" instead of "ProductCategory", that will also generate it correctly (as "ProductCategory") everywhere in the project with the name conventions in Laravel
+- So, the **Invalid Examples** will convert to the **Valid Examples**. But you should use the names singularly (e.g., Employee, employee)
+
 From this single resource name, CRUD Pack dynamically derives:
 | Item              | Result                                              |
 |-------------------|-----------------------------------------------------|

@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class {{MODEL_CLASS}}Request extends FormRequest
 {
@@ -24,5 +26,60 @@ class {{MODEL_CLASS}}Request extends FormRequest
                 Rule::unique('{{TABLE}}', 'name')->ignore($id),
             ],
         ];
+    }
+
+    /**
+     * Optional custom messages (developer can customize later).
+     */
+    public function messages(): array
+    {
+        return [
+            // 'name.required' => 'Name is required.',
+            // 'name.unique'   => 'Name must be unique.',
+            // 'unexpected_fields' => 'Unexpected fields: :fields',
+        ];
+    }
+
+    /**
+     * Reject any unexpected keys (strict validation).
+     * Example: sending "ids" or "foo" will now fail with 422.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            // Only allow keys defined in rules()
+            $allowed = array_keys($this->rules());
+
+            // Ignore framework/meta keys (web forms, method spoofing, etc.)
+            $ignore = ['_token', '_method'];
+
+            $payloadKeys = array_keys($this->all());
+
+            $extra = array_values(array_diff($payloadKeys, array_merge($allowed, $ignore)));
+
+            if (!empty($extra)) {
+                $msg = $this->messages()['unexpected_fields']
+                    ?? ('Unexpected fields: ' . implode(', ', $extra));
+
+                $validator->errors()->add('unexpected_fields', $msg);
+            }
+        });
+    }
+
+    /**
+     * Force JSON validation response for API requests,
+     * while keeping default redirect behavior for web.
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors'  => $validator->errors(),
+            ], 422));
+        }
+
+        parent::failedValidation($validator);
     }
 }

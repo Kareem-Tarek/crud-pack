@@ -52,7 +52,6 @@ class CrudPackPostmanCommand extends Command
         $appFolder['item'] = $appFolder['item'] ?? [];
 
         // If --force => remove all folders that came from CRUDPACK blocks, then recreate from scratch.
-        // We mark folders we generate with a description tag for safe identification.
         if ((bool) $this->option('force')) {
             $appFolder['item'] = array_values(array_filter(
                 $appFolder['item'],
@@ -73,7 +72,6 @@ class CrudPackPostmanCommand extends Command
             if ($existingIdx === null) {
                 $appFolder['item'][] = $folder;
             } else {
-                // Replace existing generated folder
                 $appFolder['item'][$existingIdx] = $folder;
             }
         }
@@ -96,10 +94,6 @@ class CrudPackPostmanCommand extends Command
     {
         $resources = [];
 
-        // Match blocks:
-        // // CRUDPACK:Product:START
-        // ...
-        // // CRUDPACK:Product:END
         $pattern = '/\/\/\s*CRUDPACK:([A-Za-z0-9_]+):START\s*(.*?)\/\/\s*CRUDPACK:\1:END/s';
 
         if (!preg_match_all($pattern, $contents, $matches, PREG_SET_ORDER)) {
@@ -110,18 +104,15 @@ class CrudPackPostmanCommand extends Command
             $resourceName = $m[1];
             $block = $m[2];
 
-            // Find apiResource uri: Route::apiResource('products', ...)
             $uri = null;
             if (preg_match("/Route::apiResource\(\s*'([^']+)'\s*,/i", $block, $mm)) {
                 $uri = $mm[1];
             }
 
-            // If no apiResource, skip (we need base uri)
             if (!$uri) {
                 continue;
             }
 
-            // soft enabled if route includes '/trash'
             $soft = (bool) preg_match("/Route::get\(\s*'".preg_quote($uri,'/')."\/trash'/i", $block);
 
             $resources[$resourceName] = [
@@ -145,20 +136,42 @@ class CrudPackPostmanCommand extends Command
         // Basic CRUD
         $items[] = $this->postmanRequest("GetAll{$singular}", 'GET', $this->apiUrl($uri));
         $items[] = $this->postmanRequest("Get{$singular}", 'GET', $this->apiUrl("{$uri}/:id"));
-        $items[] = $this->postmanRequest("Store{$singular}", 'POST', $this->apiUrl($uri), true);
-        $items[] = $this->postmanRequest("Update{$singular}", 'PUT', $this->apiUrl("{$uri}/:id"), true);
+
+        // Store / Update => request validation body (NO ids)
+        $items[] = $this->postmanRequest("Store{$singular}", 'POST', $this->apiUrl($uri), [
+            'name' => 'Example',
+        ]);
+        $items[] = $this->postmanRequest("Update{$singular}", 'PUT', $this->apiUrl("{$uri}/:id"), [
+            'name' => 'Example',
+        ]);
+
+        // Destroy single => NO body
         $items[] = $this->postmanRequest("Destroy{$singular}", 'DELETE', $this->apiUrl("{$uri}/:id"));
 
-        // Bulk destroy (always)
-        $items[] = $this->postmanRequest("Destroy{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/bulk"), true);
+        // Bulk destroy => ONLY ids[] body
+        $items[] = $this->postmanRequest("Destroy{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/bulk"), [
+            'ids' => [1, 2, 3],
+        ]);
 
         // Soft delete endpoints (only if enabled)
         if ($soft) {
             $items[] = $this->postmanRequest("Trash{$singular}", 'GET', $this->apiUrl("{$uri}/trash"));
+
+            // Restore single => NO body
             $items[] = $this->postmanRequest("Restore{$singular}", 'POST', $this->apiUrl("{$uri}/:id/restore"));
-            $items[] = $this->postmanRequest("Restore{$singular}Bulk", 'POST', $this->apiUrl("{$uri}/restore-bulk"), true);
+
+            // Restore bulk => ONLY ids[] body
+            $items[] = $this->postmanRequest("Restore{$singular}Bulk", 'POST', $this->apiUrl("{$uri}/restore-bulk"), [
+                'ids' => [1, 2, 3],
+            ]);
+
+            // Force delete single => NO body
             $items[] = $this->postmanRequest("ForceDelete{$singular}", 'DELETE', $this->apiUrl("{$uri}/:id/force"));
-            $items[] = $this->postmanRequest("ForceDelete{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/force-bulk"), true);
+
+            // Force delete bulk => ONLY ids[] body
+            $items[] = $this->postmanRequest("ForceDelete{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/force-bulk"), [
+                'ids' => [1, 2, 3],
+            ]);
         }
 
         return [
@@ -168,7 +181,11 @@ class CrudPackPostmanCommand extends Command
         ];
     }
 
-    protected function postmanRequest(string $name, string $method, string $url, bool $hasBody = false): array
+    /**
+     * If $body === null => no request body is included.
+     * If $body is array => raw JSON body included + Content-Type header set.
+     */
+    protected function postmanRequest(string $name, string $method, string $url, ?array $body = null): array
     {
         $headers = [
             ['key' => 'Accept', 'value' => 'application/json'],
@@ -183,16 +200,11 @@ class CrudPackPostmanCommand extends Command
             ],
         ];
 
-        if ($hasBody && in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-            // For bulk delete we still include body as ids
+        if (is_array($body)) {
             $request['request']['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
-
             $request['request']['body'] = [
                 'mode' => 'raw',
-                'raw' => json_encode([
-                    'name' => 'Example',
-                    'ids' => '1,2,3',
-                ], JSON_PRETTY_PRINT),
+                'raw' => json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
             ];
         }
 
@@ -201,8 +213,6 @@ class CrudPackPostmanCommand extends Command
 
     protected function apiUrl(string $path): string
     {
-        // Uses variables for flexibility
-        // Example: {{base_url}}/{{api_prefix}}/products
         return rtrim('{{base_url}}', '/') . '/' . trim('{{api_prefix}}', '/') . '/' . ltrim($path, '/');
     }
 
@@ -212,7 +222,6 @@ class CrudPackPostmanCommand extends Command
             $json = json_decode($this->files->get($path), true);
 
             if (is_array($json) && isset($json['info'], $json['item'])) {
-                // Ensure variables exist
                 $json['variable'] = $this->ensureVariables($json['variable'] ?? []);
                 return $json;
             }
