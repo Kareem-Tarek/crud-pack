@@ -114,7 +114,7 @@ It generates a **complete, real-world CRUD blueprint** that:
 - Keeps all logic explicit and visible (commented & uncommented components)
 - Encourages customization instead of hiding behavior
 - Handles many operations dynamically through CLI (interactive wizard mode)
-- Supports full-stack features (MVC web) and also back-end (api)
+- Supports full-stack features (**MVC Web**) and also back-end (**RESTful API**)
 
 The goal is **speed without sacrificing control**.
 
