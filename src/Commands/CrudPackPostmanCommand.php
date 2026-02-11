@@ -116,7 +116,7 @@ class CrudPackPostmanCommand extends Command
             $soft = (bool) preg_match("/Route::get\(\s*'".preg_quote($uri,'/')."\/trash'/i", $block);
 
             $resources[$resourceName] = [
-                'uri' => $uri,
+                'uri'  => $uri,
                 'soft' => $soft,
             ];
         }
@@ -130,13 +130,20 @@ class CrudPackPostmanCommand extends Command
     protected function buildResourceFolder(string $resourceName, string $uri, bool $soft): array
     {
         $singular = $resourceName;
-        $plural = $resourceName . 's';
+        $plural   = $resourceName . 's';
 
         $items = [];
 
+        // =========================================================
+        // PAGINATED ENDPOINTS:
+        // - GetAll{Plural}  => GET /{uri}?page=1 (disabled)
+        // - Trash{Plural}   => GET /{uri}/trash?page=1 (disabled)
+        // These MUST use a Postman URL OBJECT with raw+host+path+query,
+        // otherwise Postman shows empty URL input.
+        // =========================================================
+
         // Basic CRUD
-        // NOTE: Index is paginated => show disabled "page" param in Postman
-        $items[] = $this->postmanRequest("GetAll{$plural}", 'GET', $this->apiUrlWithPageParam($uri));
+        $items[] = $this->postmanRequest("GetAll{$plural}", 'GET', $this->apiUrlObject($uri, true));
         $items[] = $this->postmanRequest("Get{$singular}", 'GET', $this->apiUrl("{$uri}/:id"));
 
         // Store / Update => request validation body (NO ids)
@@ -157,8 +164,7 @@ class CrudPackPostmanCommand extends Command
 
         // Soft delete endpoints (only if enabled)
         if ($soft) {
-            // Trash is paginated => show disabled "page" param in Postman
-            $items[] = $this->postmanRequest("Trash{$plural}", 'GET', $this->apiUrlWithPageParam("{$uri}/trash"));
+            $items[] = $this->postmanRequest("Trash{$plural}", 'GET', $this->apiUrlObject("{$uri}/trash", true));
 
             // Restore single => NO body
             $items[] = $this->postmanRequest("Restore{$singular}", 'POST', $this->apiUrl("{$uri}/:id/restore"));
@@ -178,9 +184,9 @@ class CrudPackPostmanCommand extends Command
         }
 
         return [
-            'name' => $resourceName,
+            'name'        => $resourceName,
             'description' => 'generated-by-crud-pack',
-            'item' => $items,
+            'item'        => $items,
         ];
     }
 
@@ -188,9 +194,9 @@ class CrudPackPostmanCommand extends Command
      * If $body === null => no request body is included.
      * If $body is array => raw JSON body included + Content-Type header set.
      *
-     * $url can be:
-     * - string (simple Postman URL)
-     * - array (Postman URL object)
+     * NOTE:
+     * - $url can be a STRING (normal requests)
+     * - OR a Postman URL OBJECT array (paginated requests)
      */
     protected function postmanRequest(string $name, string $method, string|array $url, ?array $body = null): array
     {
@@ -203,7 +209,7 @@ class CrudPackPostmanCommand extends Command
             'request' => [
                 'method' => strtoupper($method),
                 'header' => $headers,
-                'url' => $url,
+                'url'    => $url, // string OR object (both valid in Postman schema)
             ],
         ];
 
@@ -211,7 +217,7 @@ class CrudPackPostmanCommand extends Command
             $request['request']['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
             $request['request']['body'] = [
                 'mode' => 'raw',
-                'raw' => json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+                'raw'  => json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
             ];
         }
 
@@ -219,7 +225,7 @@ class CrudPackPostmanCommand extends Command
     }
 
     /**
-     * Normal URL string (works everywhere)
+     * Default string URL (keeps existing behavior)
      */
     protected function apiUrl(string $path): string
     {
@@ -227,23 +233,37 @@ class CrudPackPostmanCommand extends Command
     }
 
     /**
-     * Postman URL object with a disabled pagination query param.
-     * IMPORTANT: Must include "raw", otherwise Postman may show an empty URL on import.
+     * Postman URL object for requests that need query params visible (pagination).
+     * This fixes the "empty URL input" issue in Postman.
      */
-    protected function apiUrlWithPageParam(string $path): array
+    protected function apiUrlObject(string $path, bool $withPageParam): array
     {
-        $raw = $this->apiUrl($path);
+        $base = rtrim('{{base_url}}', '/');          // e.g. {{base_url}}
+        $prefix = trim('{{api_prefix}}', '/');       // e.g. api
+        $cleanPath = ltrim($path, '/');              // e.g. products or products/trash
 
-        return [
-            'raw' => $raw,
-            'query' => [
+        $raw = "{$base}/{$prefix}/{$cleanPath}";
+
+        // Build path segments the Postman way (api + products + trash)
+        $segments = array_values(array_filter(explode('/', "{$prefix}/{$cleanPath}")));
+
+        $url = [
+            'raw'  => $raw,
+            'host' => ['{{base_url}}'],
+            'path' => $segments,
+        ];
+
+        if ($withPageParam) {
+            $url['query'] = [
                 [
-                    'key' => 'page',
-                    'value' => '1',
+                    'key'      => 'page',
+                    'value'    => '1',
                     'disabled' => true,
                 ],
-            ],
-        ];
+            ];
+        }
+
+        return $url;
     }
 
     protected function loadOrCreateCollection(string $appName, string $path): array
