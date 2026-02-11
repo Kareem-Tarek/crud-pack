@@ -258,8 +258,8 @@ class CrudMakeCommand extends Command
             $this->ensureDir($viewsDir);
 
             $deletedButton = $soft
-                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a>\n"
-                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash</a> --}}\n";
+                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a>\n"
+                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a> --}}\n";
 
             // Bulk block is dynamic based on $soft
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);

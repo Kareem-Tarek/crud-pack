@@ -18,21 +18,48 @@ class {{MODEL_CLASS}}Controller extends Controller
     protected string $viewFolder = '{{VIEW_FOLDER}}';
 
 {{CONSTRUCTOR}}
+    /**
+     * True if the model uses SoftDeletes.
+     */
+    protected function supportsSoftDeletes(): bool
+    {
+        $uses = class_uses_recursive($this->modelClass) ?: [];
+        return in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, $uses, true);
+    }
+
+    /**
+     * Provide counts for navigation + views (whole table counts, not paginator counts).
+     */
+    protected function crudCounts(): array
+    {
+        $totalCount = $this->modelClass::query()->count();
+
+        $trashedTotal = 0;
+        if ($this->supportsSoftDeletes()) {
+            $trashedTotal = $this->modelClass::onlyTrashed()->count();
+        }
+
+        return [$totalCount, $trashedTotal];
+    }
+
     public function index()
     {
 {{AUTH_INDEX}}
-        $totalCount = {{MODEL_CLASS}}::query()->count();
-        ${{MODEL_VAR_PLURAL}} = {{MODEL_CLASS}}::query()->paginate(15);
+        [$totalCount, $trashedTotal] = $this->crudCounts();
 
-        return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount'));
+        ${{MODEL_VAR_PLURAL}} = $this->modelClass::query()->paginate(15);
+
+        return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount', 'trashedTotal'));
     }
 
     public function create()
     {
 {{AUTH_CREATE}}
+        [$totalCount, $trashedTotal] = $this->crudCounts();
+
         ${{MODEL_VAR}} = new {{MODEL_CLASS}}();
 
-        return view('{{VIEW_FOLDER}}.create', compact('{{MODEL_VAR}}'));
+        return view('{{VIEW_FOLDER}}.create', compact('{{MODEL_VAR}}', 'totalCount', 'trashedTotal'));
     }
 
     public function store({{REQUEST_TYPEHINT}} $request)
@@ -60,13 +87,17 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function show({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
 {{AUTH_SHOW}}
-        return view('{{VIEW_FOLDER}}.show', compact('{{MODEL_VAR}}'));
+        [$totalCount, $trashedTotal] = $this->crudCounts();
+
+        return view('{{VIEW_FOLDER}}.show', compact('{{MODEL_VAR}}', 'totalCount', 'trashedTotal'));
     }
 
     public function edit({{MODEL_CLASS}} ${{MODEL_VAR}})
     {
 {{AUTH_EDIT}}
-        return view('{{VIEW_FOLDER}}.edit', compact('{{MODEL_VAR}}'));
+        [$totalCount, $trashedTotal] = $this->crudCounts();
+
+        return view('{{VIEW_FOLDER}}.edit', compact('{{MODEL_VAR}}', 'totalCount', 'trashedTotal'));
     }
 
     public function update({{REQUEST_TYPEHINT}} $request, {{MODEL_CLASS}} ${{MODEL_VAR}})

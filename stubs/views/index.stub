@@ -6,7 +6,7 @@
     <div class="d-flex align-items-center gap-2">
       <h1 class="h4 m-0">{{MODEL_CLASS}} List</h1>
 
-      {{-- Total count (whole DB result for this listing query) --}}
+      {{-- Total count (whole DB result for this table) --}}
       <span class="badge bg-secondary">
         Total: {{ $totalCount ?? 0 }}
       </span>

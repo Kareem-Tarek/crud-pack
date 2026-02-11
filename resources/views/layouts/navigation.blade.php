@@ -22,6 +22,14 @@
 
                 @php
                     $crudResources = config('crud-pack.resources', []);
+
+                    // Current resource base name (e.g. "products" from "products.index")
+                    $currentRoute = \Illuminate\Support\Facades\Route::currentRouteName();
+                    $currentBase  = $currentRoute ? explode('.', $currentRoute)[0] : null;
+
+                    // Totals passed from controller (only for current resource)
+                    $listCount  = (int)($totalCount ?? 0);
+                    $trashCount = (int)($trashedTotal ?? 0);
                 @endphp
 
                 @if(!empty($crudResources))
@@ -41,6 +49,8 @@
                                     $label = $res['label'] ?? 'Resource';
                                     $base  = $res['route'] ?? null;
                                     $soft  = (bool)($res['soft_deletes'] ?? false);
+
+                                    $isCurrent = $base && $currentBase && ($base === $currentBase);
                                 @endphp
 
                                 @continue(!$base)
@@ -52,6 +62,9 @@
                                 <li>
                                     <a class="dropdown-item" href="{{ route($base . '.index') }}">
                                         List
+                                        @if($isCurrent)
+                                            <span class="text-muted">({{ $listCount }})</span>
+                                        @endif
                                     </a>
                                 </li>
 
@@ -65,6 +78,9 @@
                                     <li>
                                         <a class="dropdown-item text-danger" href="{{ route($base . '.trash') }}">
                                             Trash
+                                            @if($isCurrent)
+                                                <span class="text-muted">({{ $trashCount }})</span>
+                                            @endif
                                         </a>
                                     </li>
                                 @endif
