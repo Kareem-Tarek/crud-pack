@@ -318,19 +318,15 @@ CRUD Pack uses **one shared delete-handling trait** across the entire applicatio
 app/Http/Controllers/Concerns/HandlesDeletes.php
 ```
 
-### To create (if not existing)/replace (if existing) the HandlesDeletes.php trait with prompting [and that is for any updates made from the package, and if you want to recreate the file to pull the updated logic] + including soft-delete methods (**uncommented**)
+### To create (if not existing)/replace (if existing) the HandlesDeletes.php trait with prompting [and that is for any updates made from the package, and if you want to recreate the file to pull the same original again or any updated logic] + including soft-delete & non-soft-deletes methods
 ```bash
-php artisan crud:trait --soft-deletes
+php artisan crud:trait
 ```
+**Note:** This is automatically generated when creating a **web**/**api** controller for the very first time in the project
 
-### Same as above (``` php artisan crud:trait --soft-deletes ```), except the soft-delete methods are included but left **commented out** (ready to enable if needed).
+### Same as above (``` php artisan crud:trait ```), but using this command to overwrite existing HandlesDeletes.php trait without prompting
 ```bash
-php artisan crud:trait --no-soft-deletes
-```
-
-### To overwrite existing HandlesDeletes.php trait without prompting + with/without including soft-delete methods
-```bash
-php artisan crud:trait [--soft-deletes or --no-soft-deletes] --force
+php artisan crud:trait --force
 ```
 
 ### Behavior
@@ -347,7 +343,7 @@ This ensures:
 - Reusable behavior across all controllers
 ---
 ## Delete & Soft-Delete Endpoints (Trait Methods)
-All delete-related endpoints live **directly inside the trait**, not in controllers.
+All delete-related endpoints live **directly inside the trait** (path: **app\Http\Controllers\Concerns\HandlesDeletes.php**), not in controllers (but using it (the **HandlesDeletes.php** trait) inside the controllers).
 
 ### Methods Provided
 ``` destroy ``` — single record delete (resource method)

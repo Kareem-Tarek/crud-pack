@@ -1,5 +1,10 @@
 <?php
 
+// ============================================================================
+// FILE: KareemTarek/CrudPack/Commands/CrudPackTraitCommand.php
+// UPDATED: remove --soft-deletes/--no-soft-deletes (trait is always superset)
+// ============================================================================
+
 namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
@@ -8,8 +13,6 @@ use Illuminate\Filesystem\Filesystem;
 class CrudPackTraitCommand extends Command
 {
     protected $signature = 'crud:trait
-        {--soft-deletes : Generate soft-delete methods uncommented}
-        {--no-soft-deletes : Generate soft-delete methods commented}
         {--force : Overwrite existing HandlesDeletes.php without prompting}';
 
     protected $description = 'Create or re-generate the shared HandlesDeletes trait in the Laravel app.';
@@ -50,28 +53,7 @@ class CrudPackTraitCommand extends Command
             }
         }
 
-        // Decide soft deletes mode
-        $soft = (bool) $this->option('soft-deletes');
-        $noSoft = (bool) $this->option('no-soft-deletes');
-
-        if ($soft && $noSoft) {
-            $this->error('Choose either --soft-deletes or --no-soft-deletes, not both.');
-            return self::FAILURE;
-        }
-
-        if (!$soft && !$noSoft) {
-            $choice = $this->choice('Soft deletes?', ['soft-deletes', 'no-soft-deletes'], 0);
-            $soft = $choice === 'soft-deletes';
-            $noSoft = !$soft;
-        }
-
         $content = $this->files->get($stub);
-
-        $softBlock = $soft
-            ? $this->softTraitMethodsActive()
-            : $this->softTraitMethodsCommented();
-
-        $content = str_replace('{{SOFT_TRAIT_METHODS}}', $softBlock, $content);
 
         // Safety: refuse if placeholders remain
         if (preg_match_all('/\{\{[A-Z0-9_\-]+}}/i', $content, $m) && !empty($m[0])) {
@@ -93,151 +75,5 @@ class CrudPackTraitCommand extends Command
     {
         return dirname(__DIR__, 2) . '/stubs/' . $relative;
     }
-
-    protected function softTraitMethodsActive(): string
-    {
-        return <<<'PHP'
-    /**
-     * List soft-deleted records (explicit route) — soft deletes only.
-     */
-    public function trash()
-    {
-        $trashedTotal = $this->modelClass::onlyTrashed()->count();
-        $items = $this->modelClass::onlyTrashed()->paginate(15);
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'      => true,
-                'message'      => 'OK',
-                'trashedTotal' => $trashedTotal,
-                'data'         => $items->items(),
-                'meta'         => [
-                    'current_page' => $items->currentPage(),
-                    'per_page'     => $items->perPage(),
-                    'last_page'    => $items->lastPage(),
-                    'from'         => $items->firstItem(),
-                    'to'           => $items->lastItem(),
-                ],
-            ], 200);
-        }
-
-        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
-    }
-
-    /**
-     * Restore single (explicit route) — soft deletes only.
-     */
-    public function restore(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->restore();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Restored successfully.',
-                'data'    => $model,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Restored successfully.');
-    }
-
-    /**
-     * Restore bulk (explicit route) — soft deletes only.
-     */
-    public function restoreBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (empty($ids)) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No records selected.',
-                ], 422);
-            }
-
-            return $this->deleteResponse('No records selected.');
-        }
-
-        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'       => true,
-                'message'       => 'Selected records restored.',
-                'restoredCount' => $count,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Selected records restored.');
-    }
-
-    /**
-     * Force delete single (explicit route) — soft deletes only.
-     */
-    public function forceDelete(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->forceDelete();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Permanently deleted.',
-            ], 200);
-        }
-
-        return $this->deleteResponse('Permanently deleted.');
-    }
-
-    /**
-     * Force delete bulk (explicit route) — soft deletes only.
-     */
-    public function forceDeleteBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (empty($ids)) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No records selected.',
-                ], 422);
-            }
-
-            return $this->deleteResponse('No records selected.');
-        }
-
-        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'      => true,
-                'message'      => 'Selected records permanently deleted.',
-                'deletedCount' => $count,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Selected records permanently deleted.');
-    }
-
-PHP;
-    }
-
-    protected function softTraitMethodsCommented(): string
-    {
-        $code = $this->softTraitMethodsActive();
-        $lines = explode("\n", rtrim($code, "\n"));
-
-        $out = [];
-        $out[] = "    // Soft Deletes disabled: uncomment after enabling SoftDeletes";
-        foreach ($lines as $line) {
-            $out[] = $line === '' ? '' : '    // ' . ltrim($line);
-        }
-        $out[] = "";
-
-        return implode("\n", $out);
-    }
 }
+

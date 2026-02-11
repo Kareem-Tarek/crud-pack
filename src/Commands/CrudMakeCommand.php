@@ -1,5 +1,12 @@
 <?php
 
+// ============================================================================
+// FILE: KareemTarek/CrudPack/Commands/CrudMakeCommand.php
+// UPDATED: ensureSharedTrait() now creates trait only if missing,
+//          never prompts again, and ignores soft mode for trait.
+//          (Everything else remains as-is from your pasted version.)
+// ============================================================================
+
 namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
@@ -155,8 +162,10 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 1) Ensure shared trait exists
+         | UPDATED: trait is always superset; create silently if missing;
+         |          never prompt again; overwrite only with --force.
          =========================== */
-        $this->ensureSharedTrait(force: $force, soft: $soft);
+        $this->ensureSharedTrait(force: $force);
 
         /* ===========================
          | 2) Controller (always)
@@ -261,7 +270,6 @@ class CrudMakeCommand extends Command
                 ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a>\n"
                 : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a> --}}\n";
 
-            // Bulk block is dynamic based on $soft
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
 
             $this->generateFromStub(
@@ -304,7 +312,6 @@ class CrudMakeCommand extends Command
                 askReplaceIfExists: true
             );
 
-            // ✅ NEW: show delete button becomes dynamic (trash vs skull + title + confirm)
             $showDeleteIcon = $soft
                 ? "<i class='fa-solid fa-trash'></i>"
                 : "<i class='fa-solid fa-skull-crossbones'></i>";
@@ -356,10 +363,6 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 8) Routes
-         | NOTE:
-         | - WEB routes go ONLY to routes/web.php
-         | - API routes go ONLY to routes/api.php
-         | - API route names are prefixed with "api." to avoid colliding with WEB route names
          =========================== */
         if ($generateRoutes) {
             $this->appendRoutes(
@@ -375,10 +378,6 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 9) Postman (API only)
-         |
-         | ✅ UPDATED: Delegate to CrudPackPostmanCommand (routes/api.php source of truth)
-         | - avoids duplicate/buggy Postman generator in this command
-         | - ensures bulk endpoints only have {"ids":[...]} and store/update have model fields only
          =========================== */
         if ($isApi) {
             $this->call('crud:postman');
@@ -390,15 +389,11 @@ class CrudMakeCommand extends Command
 
     /* ============================================================
      | Ensure Laravel 11+ API scaffold exists (install:api)
-     | - If routes/api.php is missing: run install:api (NO --force)
-     | - If it exists: ask to run install:api (default is NO)
-     | - After running: cleanup bootstrap/app.php duplicated "api:" keys
      ============================================================ */
     protected function ensureApiRoutesInstalled(): void
     {
         $apiRoutesPath = base_path('routes/api.php');
 
-        // Missing => MUST install so api routes make sense
         if (!$this->files->exists($apiRoutesPath)) {
             $this->info('routes/api.php not found. Running: php artisan install:api');
             $this->runInstallApiCommand();
@@ -412,10 +407,6 @@ class CrudMakeCommand extends Command
             return;
         }
 
-        /**
-         * Exists => DO NOT run install:api automatically.
-         * Ask, and default to NO (press Enter => NO).
-         */
         $reinstall = $this->confirm(
             "routes/api.php already exists.\nRun `php artisan install:api` anyway? (Laravel will ask before overwriting)\nDefault: NO",
             false
@@ -433,24 +424,12 @@ class CrudMakeCommand extends Command
     protected function runInstallApiCommand(): void
     {
         try {
-            // Use $this->call() to preserve interactive prompts safely.
             $this->call('install:api');
         } catch (\Throwable $e) {
             $this->error('Failed to run install:api: ' . $e->getMessage());
         }
     }
 
-    /**
-     * Fix duplication like:
-     *   ->withRouting(
-     *      web: ...,
-     *      api: ...,
-     *      api: ...,
-     *   )
-     *
-     * Keeps the FIRST "api:" and removes subsequent duplicates
-     * ONLY inside the withRouting(...) block.
-     */
     protected function cleanupBootstrapAppRoutingApiKey(): void
     {
         $path = base_path('bootstrap/app.php');
@@ -461,7 +440,6 @@ class CrudMakeCommand extends Command
 
         $content = $this->files->get($path);
 
-        // fast exit
         if (substr_count($content, "api: __DIR__.'/../routes/api.php'") <= 1) {
             return;
         }
@@ -473,36 +451,31 @@ class CrudMakeCommand extends Command
         $out = [];
 
         foreach ($lines as $line) {
-            // Enter withRouting(
             if (!$inWithRouting && str_contains($line, '->withRouting(')) {
                 $inWithRouting = true;
-                $apiSeen = false; // reset per block
+                $apiSeen = false;
                 $out[] = $line;
                 continue;
             }
 
-            // Exit withRouting block when we hit the closing ");" line
             if ($inWithRouting && preg_match('/^\s*\)\s*[,;]?\s*$/', $line)) {
                 $inWithRouting = false;
                 $out[] = $line;
                 continue;
             }
 
-            // If inside withRouting, drop duplicate api: lines
             if ($inWithRouting) {
                 $isApiLine = (bool) preg_match(
                     "/^\s*api\s*:\s*__DIR__\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
                     $line
                 );
 
-                // more robust match (most common)
                 if (!$isApiLine && str_contains($line, "api: __DIR__.'/../routes/api.php'")) {
                     $isApiLine = true;
                 }
 
                 if ($isApiLine) {
                     if ($apiSeen) {
-                        // skip duplicate
                         continue;
                     }
                     $apiSeen = true;
@@ -554,30 +527,23 @@ class CrudMakeCommand extends Command
     }
 
     /* ============================================================
-     | Trait generation
+     | Trait generation (UPDATED)
+     | - If missing: create silently
+     | - If exists and no --force: do nothing (no prompt)
+     | - If --force: overwrite silently
      ============================================================ */
-    protected function ensureSharedTrait(bool $force, bool $soft): void
+    protected function ensureSharedTrait(bool $force): void
     {
         $target = app_path('Http/Controllers/Concerns/HandlesDeletes.php');
 
         if ($this->files->exists($target) && !$force) {
-            $replace = $this->confirm("HandlesDeletes trait already exists. Replace it?", false);
-            if (!$replace) {
-                $this->warn('Skipped HandlesDeletes trait.');
-                return;
-            }
+            return;
         }
-
-        $softMethods = $soft
-            ? $this->softTraitMethodsActive()
-            : $this->softTraitMethodsCommented();
 
         $this->generateFromStub(
             stub: $this->stubPath('traits/HandlesDeletes.stub'),
             target: $target,
-            replacements: [
-                '{{SOFT_TRAIT_METHODS}}' => $softMethods,
-            ],
+            replacements: [], // no placeholders anymore
             force: true,
             askReplaceIfExists: false
         );
@@ -612,7 +578,6 @@ class CrudMakeCommand extends Command
             $requestData = '$request->validated()';
         }
 
-        // Authorization imports/traits/constructor (resource style only)
         $authImport = '';
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
@@ -679,7 +644,6 @@ PHP;
 
         $policyStyle = strtolower(trim($policyStyle));
 
-        // resource uses authorizeResource() in constructor only
         if ($policyStyle === 'none' || $policyStyle === 'resource') {
             return $empty;
         }
@@ -922,155 +886,6 @@ PHP;
     }
 
     /* ============================================================
-     | Trait soft methods
-     ============================================================ */
-    protected function softTraitMethodsActive(): string
-    {
-        return <<<'PHP'
-    /**
-     * List soft-deleted records (explicit route) — soft deletes only.
-     */
-    public function trash()
-    {
-        $trashedTotal = $this->modelClass::onlyTrashed()->count();
-        $items = $this->modelClass::onlyTrashed()->paginate(15);
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'      => true,
-                'message'      => 'OK',
-                'trashedTotal' => $trashedTotal,
-                'data'         => $items->items(),
-                'meta'         => [
-                    'current_page' => $items->currentPage(),
-                    'per_page'     => $items->perPage(),
-                    'last_page'    => $items->lastPage(),
-                    'from'         => $items->firstItem(),
-                    'to'           => $items->lastItem(),
-                ],
-            ], 200);
-        }
-
-        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
-    }
-
-    /**
-     * Restore single (explicit route) — soft deletes only.
-     */
-    public function restore(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->restore();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Restored successfully.',
-                'data'    => $model,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Restored successfully.');
-    }
-
-    /**
-     * Restore bulk (explicit route) — soft deletes only.
-     */
-    public function restoreBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (empty($ids)) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No records selected.',
-                ], 422);
-            }
-
-            return $this->deleteResponse('No records selected.');
-        }
-
-        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'       => true,
-                'message'       => 'Selected records restored.',
-                'restoredCount' => $count,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Selected records restored.');
-    }
-
-    /**
-     * Force delete single (explicit route) — soft deletes only.
-     */
-    public function forceDelete(int|string $id)
-    {
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
-        $model->forceDelete();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Permanently deleted.',
-            ], 200);
-        }
-
-        return $this->deleteResponse('Permanently deleted.');
-    }
-
-    /**
-     * Force delete bulk (explicit route) — soft deletes only.
-     */
-    public function forceDeleteBulk(Request $request)
-    {
-        $ids = $this->extractIds($request);
-
-        if (empty($ids)) {
-            if (request()->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No records selected.',
-                ], 422);
-            }
-
-            return $this->deleteResponse('No records selected.');
-        }
-
-        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
-
-        if (request()->expectsJson()) {
-            return response()->json([
-                'success'      => true,
-                'message'      => 'Selected records permanently deleted.',
-                'deletedCount' => $count,
-            ], 200);
-        }
-
-        return $this->deleteResponse('Selected records permanently deleted.');
-    }
-PHP;
-    }
-
-    protected function softTraitMethodsCommented(): string
-    {
-        $code = $this->softTraitMethodsActive();
-        $lines = explode("\n", rtrim($code, "\n"));
-
-        $out = [];
-        $out[] = "    // Soft Deletes disabled: uncomment after enabling SoftDeletes";
-        foreach ($lines as $line) {
-            $out[] = $line === '' ? '' : "    // " . ltrim($line);
-        }
-        $out[] = "";
-
-        return implode("\n", $out);
-    }
-
-    /* ============================================================
      | Bulk delete view block (dynamic confirm + label)
      ============================================================ */
     protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural, bool $soft): string
@@ -1270,3 +1085,4 @@ BLADE;
             || $this->optionWasProvided('views');
     }
 }
+

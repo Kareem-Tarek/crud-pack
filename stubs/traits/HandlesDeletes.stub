@@ -1,5 +1,10 @@
 <?php
 
+// ============================================================================
+// FILE: stubs/traits/HandlesDeletes.stub
+// UPDATED: Superset trait (always includes soft + non-soft), no placeholders.
+// ============================================================================
+
 namespace App\Http\Controllers\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
@@ -8,6 +13,16 @@ use Illuminate\Support\Arr;
 
 trait HandlesDeletes
 {
+    /**
+     * True if the model uses SoftDeletes.
+     * Controller may override, but this default works for both web/api controllers.
+     */
+    protected function supportsSoftDeletes(): bool
+    {
+        $uses = class_uses_recursive($this->modelClass) ?: [];
+        return in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, $uses, true);
+    }
+
     /**
      * Single delete (resource destroy).
      * Works with Route::resource / Route::apiResource.
@@ -43,16 +58,172 @@ trait HandlesDeletes
     }
 
     /* ============================================================
-     | SOFT DELETE FEATURES (generated active or commented by CLI)
-     | If --soft-deletes => UNCOMMENTED
-     | If --no-soft-deletes => COMMENTED
+     | SOFT DELETE FEATURES
+     | Always present, but guarded.
+     | If the model doesn't use SoftDeletes => returns a safe response.
      ============================================================ */
 
-{{SOFT_TRAIT_METHODS}}
+    /**
+     * List soft-deleted records (explicit route) — soft deletes only.
+     */
+    public function trash()
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $trashedTotal = $this->modelClass::onlyTrashed()->count();
+        $items = $this->modelClass::onlyTrashed()->paginate(15);
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'OK',
+                'trashedTotal' => $trashedTotal,
+                'data'         => $items->items(),
+                'meta'         => [
+                    'current_page' => $items->currentPage(),
+                    'per_page'     => $items->perPage(),
+                    'last_page'    => $items->lastPage(),
+                    'from'         => $items->firstItem(),
+                    'to'           => $items->lastItem(),
+                ],
+            ], 200);
+        }
+
+        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
+    }
+
+    /**
+     * Restore single (explicit route) — soft deletes only.
+     */
+    public function restore(int|string $id)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
+        $model->restore();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Restored successfully.',
+                'data'    => $model,
+            ], 200);
+        }
+
+        return $this->deleteResponse('Restored successfully.');
+    }
+
+    /**
+     * Restore bulk (explicit route) — soft deletes only.
+     */
+    public function restoreBulk(Request $request)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $ids = $this->extractIds($request);
+
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->restore();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'       => true,
+                'message'       => 'Selected records restored.',
+                'restoredCount' => $count,
+            ], 200);
+        }
+
+        return $this->deleteResponse('Selected records restored.');
+    }
+
+    /**
+     * Force delete single (explicit route) — soft deletes only.
+     */
+    public function forceDelete(int|string $id)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
+        $model->forceDelete();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Permanently deleted.',
+            ], 200);
+        }
+
+        return $this->deleteResponse('Permanently deleted.');
+    }
+
+    /**
+     * Force delete bulk (explicit route) — soft deletes only.
+     */
+    public function forceDeleteBulk(Request $request)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $ids = $this->extractIds($request);
+
+        if (empty($ids)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No records selected.',
+                ], 422);
+            }
+
+            return $this->deleteResponse('No records selected.');
+        }
+
+        $count = $this->modelClass::onlyTrashed()->whereKey($ids)->forceDelete();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Selected records permanently deleted.',
+                'deletedCount' => $count,
+            ], 200);
+        }
+
+        return $this->deleteResponse('Selected records permanently deleted.');
+    }
 
     /* ===========================
      | Utilities
      =========================== */
+
+    protected function softNotSupportedResponse()
+    {
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Soft deletes are not enabled for this resource.',
+            ], 404);
+        }
+
+        return redirect()->back()->with('error', 'Soft deletes are not enabled for this resource.');
+    }
 
     protected function extractIds(Request $request): array
     {
@@ -87,3 +258,4 @@ trait HandlesDeletes
         return redirect()->back()->with('success', $message);
     }
 }
+
