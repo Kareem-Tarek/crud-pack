@@ -14,19 +14,10 @@ class {{MODEL_CLASS}}Controller extends Controller
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
 
-    // Used by HandlesDeletes::deleted()
+    // Used by HandlesDeletes::trash() view rendering (web only)
     protected string $viewFolder = '{{VIEW_FOLDER}}';
 
 {{CONSTRUCTOR}}
-    /**
-     * True if the model uses SoftDeletes.
-     */
-    protected function supportsSoftDeletes(): bool
-    {
-        $uses = class_uses_recursive($this->modelClass) ?: [];
-        return in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, $uses, true);
-    }
-
     /**
      * Provide counts for navigation + views (whole table counts, not paginator counts).
      */

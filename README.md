@@ -355,9 +355,17 @@ All delete-related endpoints live **directly inside the trait** (path: **app\Htt
 ``` forceDeleteBulk ``` — permanently delete multiple records
 
 ### Important Rules
-- destroy is **always active**
+- ``` destroy ``` and ``` destroyBulk ``` is **always active**
 - The other six methods are soft-delete related
-- The trait always contains real logic
+  1] performDestroy
+    - this is related to the controller (resource methods) but, the core logic is written here since in the "``` app\Http\Controllers\Concerns\HandlesDeletes.php ```" has all the delete methods **--soft-deletes** and **--no-soft-deletes**
+  2] performDestroyBulk
+  3] trash
+  4] restore
+  5] restoreBulk
+  6] forceDelete
+  7] forceDeleteBulk
+- The trait (``` app\Http\Controllers\Concerns\HandlesDeletes.php ```) always contains real logic (**the 7 methods mentioned above**)
 - Methods are enabled/disabled via **routes**, not by modifying the trait
 - Responses automatically adapt:
     - JSON for API

@@ -3,6 +3,7 @@
 // ============================================================================
 // FILE: stubs/traits/HandlesDeletes.stub
 // UPDATED: Superset trait (always includes soft + non-soft), no placeholders.
+//          Soft methods are guarded + only reachable if routes are enabled.
 // ============================================================================
 
 namespace App\Http\Controllers\Concerns;
@@ -61,6 +62,7 @@ trait HandlesDeletes
      | SOFT DELETE FEATURES
      | Always present, but guarded.
      | If the model doesn't use SoftDeletes => returns a safe response.
+     | NOTE: Whether these endpoints are reachable is controlled by routes.
      ============================================================ */
 
     /**
@@ -89,6 +91,11 @@ trait HandlesDeletes
                     'to'           => $items->lastItem(),
                 ],
             ], 200);
+        }
+
+        // Web only: require controller to define $viewFolder
+        if (!property_exists($this, 'viewFolder') || empty($this->viewFolder)) {
+            return redirect()->back()->with('error', 'View folder is not configured for this controller.');
         }
 
         return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
@@ -258,4 +265,3 @@ trait HandlesDeletes
         return redirect()->back()->with('success', $message);
     }
 }
-
