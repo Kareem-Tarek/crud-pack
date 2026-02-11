@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Eloquent model
   - Migration
   - Form request (store + update)
+    - The same form request (e.g., ProductRequest) will work for the request validation for both methods (store & update)
   - Policy
   - Blade views (Web only)
     - Ready-blades with responsive design for the CRUD operations for any created resource with also a ready-logic within those blades UI/UX is handled
