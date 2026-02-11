@@ -24,11 +24,21 @@ class {{MODEL_CLASS}}Controller extends Controller
         try {
             $query = {{MODEL_CLASS}}::query();
 
+            $totalCount = $query->count();
+            $items = $query->paginate(15);
+
             return response()->json([
                 'success'    => true,
                 'message'    => 'OK',
-                'totalCount' => $query->count(),
-                'data'       => $query->get(),
+                'totalCount' => $totalCount,
+                'data'       => $items->items(),
+                'meta'       => [
+                    'current_page' => $items->currentPage(),
+                    'per_page'     => $items->perPage(),
+                    'last_page'    => $items->lastPage(),
+                    'from'         => $items->firstItem(),
+                    'to'           => $items->lastItem(),
+                ],
             ], 200);
         } catch (\Throwable $e) {
             return response()->json([

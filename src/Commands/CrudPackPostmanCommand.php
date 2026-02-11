@@ -4,6 +4,7 @@ namespace KareemTarek\CrudPack\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 
 class CrudPackPostmanCommand extends Command
 {
@@ -130,18 +131,26 @@ class CrudPackPostmanCommand extends Command
     protected function buildResourceFolder(string $resourceName, string $uri, bool $soft): array
     {
         $singular = $resourceName;
-        $plural = $resourceName . 's';
+        $plural   = Str::pluralStudly($resourceName);
 
         $items = [];
 
-        // Basic CRUD
-        $items[] = $this->postmanRequest("GetAll{$plural}", 'GET', $this->apiUrl($uri));
+        // Basic CRUD (Index is paginated => add disabled page param)
+        $items[] = $this->postmanRequest(
+            "GetAll{$plural}",
+            'GET',
+            $this->apiUrl($uri),
+            body: null,
+            queryParams: $this->disabledPageParam()
+        );
+
         $items[] = $this->postmanRequest("Get{$singular}", 'GET', $this->apiUrl("{$uri}/:id"));
 
         // Store / Update => request validation body (NO ids)
         $items[] = $this->postmanRequest("Store{$singular}", 'POST', $this->apiUrl($uri), [
             'name' => 'Example',
         ]);
+
         $items[] = $this->postmanRequest("Update{$singular}", 'PUT', $this->apiUrl("{$uri}/:id"), [
             'name' => 'Example',
         ]);
@@ -156,7 +165,14 @@ class CrudPackPostmanCommand extends Command
 
         // Soft delete endpoints (only if enabled)
         if ($soft) {
-            $items[] = $this->postmanRequest("Trash{$plural}", 'GET', $this->apiUrl("{$uri}/trash"));
+            // Trash is paginated => add disabled page param
+            $items[] = $this->postmanRequest(
+                "Trash{$plural}",
+                'GET',
+                $this->apiUrl("{$uri}/trash"),
+                body: null,
+                queryParams: $this->disabledPageParam()
+            );
 
             // Restore single => NO body
             $items[] = $this->postmanRequest("Restore{$singular}", 'POST', $this->apiUrl("{$uri}/:id/restore"));
@@ -185,9 +201,15 @@ class CrudPackPostmanCommand extends Command
     /**
      * If $body === null => no request body is included.
      * If $body is array => raw JSON body included + Content-Type header set.
+     * If $queryParams provided => Postman url object will include query[] with disabled flags.
      */
-    protected function postmanRequest(string $name, string $method, string $url, ?array $body = null): array
-    {
+    protected function postmanRequest(
+        string $name,
+        string $method,
+        string $url,
+        ?array $body = null,
+        ?array $queryParams = null
+    ): array {
         $headers = [
             ['key' => 'Accept', 'value' => 'application/json'],
         ];
@@ -197,7 +219,7 @@ class CrudPackPostmanCommand extends Command
             'request' => [
                 'method' => strtoupper($method),
                 'header' => $headers,
-                'url' => $url, // string raw is valid in Postman schema
+                'url' => $this->postmanUrl($url, $queryParams),
             ],
         ];
 
@@ -210,6 +232,29 @@ class CrudPackPostmanCommand extends Command
         }
 
         return $request;
+    }
+
+    protected function postmanUrl(string $rawUrl, ?array $queryParams = null): string|array
+    {
+        if (empty($queryParams)) {
+            return $rawUrl; // keep as string when no query needed
+        }
+
+        return [
+            'raw' => $rawUrl,
+            'query' => $queryParams,
+        ];
+    }
+
+    protected function disabledPageParam(): array
+    {
+        return [
+            [
+                'key' => 'page',
+                'value' => '1',
+                'disabled' => true, // unchecked by default
+            ],
+        ];
     }
 
     protected function apiUrl(string $path): string
