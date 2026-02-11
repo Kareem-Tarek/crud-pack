@@ -375,13 +375,13 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 9) Postman (API only)
+         |
+         | ✅ UPDATED: Delegate to CrudPackPostmanCommand (routes/api.php source of truth)
+         | - avoids duplicate/buggy Postman generator in this command
+         | - ensures bulk endpoints only have {"ids":[...]} and store/update have model fields only
          =========================== */
         if ($isApi) {
-            $this->upsertPostmanForResource(
-                resourceName: $name,
-                uri: $uri,
-                soft: $soft
-            );
+            $this->call('crud:postman');
         }
 
         $this->info("Done. CRUD resource generated for [{$name}].");
@@ -1194,152 +1194,6 @@ PHP;
         })();
     </script>
 BLADE;
-    }
-
-    /* ============================================================
-     | Postman auto update for a single resource (API only)
-     ============================================================ */
-    protected function upsertPostmanForResource(string $resourceName, string $uri, bool $soft): void
-    {
-        $appName = (string) config('app.name', 'Laravel');
-        $path = base_path('postman/CrudPack.postman_collection.json');
-
-        $collection = $this->loadOrCreatePostmanCollection($appName, $path);
-
-        // Ensure top-level app folder exists
-        $appIndex = $this->findPostmanFolderIndex($collection['item'] ?? [], $appName);
-        if ($appIndex === null) {
-            $collection['item'][] = ['name' => $appName, 'item' => []];
-            $appIndex = count($collection['item']) - 1;
-        }
-
-        $collection['item'][$appIndex]['item'] = $collection['item'][$appIndex]['item'] ?? [];
-
-        $resourceFolder = $this->buildPostmanFolderForResource($resourceName, $uri, $soft);
-
-        $existing = $this->findPostmanFolderIndex($collection['item'][$appIndex]['item'], $resourceName);
-        if ($existing === null) {
-            $collection['item'][$appIndex]['item'][] = $resourceFolder;
-        } else {
-            $collection['item'][$appIndex]['item'][$existing] = $resourceFolder;
-        }
-
-        $this->ensureDir(dirname($path));
-        $this->files->put($path, json_encode($collection, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-        $this->info('✅ Postman collection updated for API resource: ' . $resourceName);
-    }
-
-    protected function loadOrCreatePostmanCollection(string $appName, string $path): array
-    {
-        if ($this->files->exists($path)) {
-            $json = json_decode($this->files->get($path), true);
-
-            if (is_array($json) && isset($json['info'], $json['item'])) {
-                $json['variable'] = $this->ensurePostmanVariables($json['variable'] ?? []);
-                return $json;
-            }
-        }
-
-        return [
-            'info' => [
-                'name' => 'CrudPack',
-                'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
-            ],
-            'item' => [
-                [
-                    'name' => $appName,
-                    'item' => [],
-                ],
-            ],
-            'variable' => $this->ensurePostmanVariables([]),
-        ];
-    }
-
-    protected function ensurePostmanVariables(array $vars): array
-    {
-        $map = [];
-        foreach ($vars as $v) {
-            if (isset($v['key'])) {
-                $map[$v['key']] = $v;
-            }
-        }
-
-        $map['base_url'] = $map['base_url'] ?? ['key' => 'base_url', 'value' => 'http://localhost'];
-        $map['api_prefix'] = $map['api_prefix'] ?? ['key' => 'api_prefix', 'value' => 'api'];
-
-        return array_values($map);
-    }
-
-    protected function findPostmanFolderIndex(array $items, string $name): ?int
-    {
-        foreach ($items as $i => $it) {
-            if (isset($it['name']) && $it['name'] === $name && isset($it['item']) && is_array($it['item'])) {
-                return $i;
-            }
-        }
-        return null;
-    }
-
-    protected function buildPostmanFolderForResource(string $resourceName, string $uri, bool $soft): array
-    {
-        $items = [];
-
-        $items[] = $this->postmanRequest("GetAll{$resourceName}", 'GET', $this->postmanApiUrl($uri));
-        $items[] = $this->postmanRequest("Get{$resourceName}", 'GET', $this->postmanApiUrl("{$uri}/:id"));
-        $items[] = $this->postmanRequest("Store{$resourceName}", 'POST', $this->postmanApiUrl($uri), true);
-        $items[] = $this->postmanRequest("Update{$resourceName}", 'PUT', $this->postmanApiUrl("{$uri}/:id"), true);
-        $items[] = $this->postmanRequest("Destroy{$resourceName}", 'DELETE', $this->postmanApiUrl("{$uri}/:id"));
-
-        $items[] = $this->postmanRequest("Destroy{$resourceName}Bulk", 'DELETE', $this->postmanApiUrl("{$uri}/bulk"), true);
-
-        if ($soft) {
-            $items[] = $this->postmanRequest("Trash{$resourceName}", 'GET', $this->postmanApiUrl("{$uri}/trash"));
-            $items[] = $this->postmanRequest("Restore{$resourceName}", 'POST', $this->postmanApiUrl("{$uri}/:id/restore"));
-            $items[] = $this->postmanRequest("Restore{$resourceName}Bulk", 'POST', $this->postmanApiUrl("{$uri}/restore-bulk"), true);
-            $items[] = $this->postmanRequest("ForceDelete{$resourceName}", 'DELETE', $this->postmanApiUrl("{$uri}/:id/force"));
-            $items[] = $this->postmanRequest("ForceDelete{$resourceName}Bulk", 'DELETE', $this->postmanApiUrl("{$uri}/force-bulk"), true);
-        }
-
-        return [
-            'name' => $resourceName,
-            'description' => 'generated-by-crud-pack',
-            'item' => $items,
-        ];
-    }
-
-    protected function postmanRequest(string $name, string $method, string $url, bool $hasBody = false): array
-    {
-        $headers = [
-            ['key' => 'Accept', 'value' => 'application/json'],
-        ];
-
-        $request = [
-            'name' => $name,
-            'request' => [
-                'method' => strtoupper($method),
-                'header' => $headers,
-                'url' => $url,
-            ],
-        ];
-
-        if ($hasBody && in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-            $request['request']['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
-            $request['request']['body'] = [
-                'mode' => 'raw',
-                'raw' => json_encode([
-                    'name' => 'Example',
-                    'ids' => '1,2,3',
-                ], JSON_PRETTY_PRINT),
-            ];
-        }
-
-        return $request;
-    }
-
-    protected function postmanApiUrl(string $path): string
-    {
-        return rtrim('{{base_url}}', '/') . '/' . trim('{{api_prefix}}', '/') . '/' . ltrim($path, '/');
     }
 
     /* ============================================================
