@@ -130,11 +130,12 @@ class CrudPackPostmanCommand extends Command
     protected function buildResourceFolder(string $resourceName, string $uri, bool $soft): array
     {
         $singular = $resourceName;
+        $plural = $resourceName . 's';
 
         $items = [];
 
         // Basic CRUD
-        $items[] = $this->postmanRequest("GetAll{$singular}", 'GET', $this->apiUrl($uri));
+        $items[] = $this->postmanRequest("GetAll{$plural}", 'GET', $this->apiUrl($uri));
         $items[] = $this->postmanRequest("Get{$singular}", 'GET', $this->apiUrl("{$uri}/:id"));
 
         // Store / Update => request validation body (NO ids)
@@ -149,19 +150,19 @@ class CrudPackPostmanCommand extends Command
         $items[] = $this->postmanRequest("Destroy{$singular}", 'DELETE', $this->apiUrl("{$uri}/:id"));
 
         // Bulk destroy => ONLY ids[] body
-        $items[] = $this->postmanRequest("Destroy{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/bulk"), [
+        $items[] = $this->postmanRequest("DestroyBulk{$singular}", 'DELETE', $this->apiUrl("{$uri}/bulk"), [
             'ids' => [1, 2, 3],
         ]);
 
         // Soft delete endpoints (only if enabled)
         if ($soft) {
-            $items[] = $this->postmanRequest("Trash{$singular}", 'GET', $this->apiUrl("{$uri}/trash"));
+            $items[] = $this->postmanRequest("Trash{$plural}", 'GET', $this->apiUrl("{$uri}/trash"));
 
             // Restore single => NO body
             $items[] = $this->postmanRequest("Restore{$singular}", 'POST', $this->apiUrl("{$uri}/:id/restore"));
 
             // Restore bulk => ONLY ids[] body
-            $items[] = $this->postmanRequest("Restore{$singular}Bulk", 'POST', $this->apiUrl("{$uri}/restore-bulk"), [
+            $items[] = $this->postmanRequest("RestoreBulk{$singular}", 'POST', $this->apiUrl("{$uri}/restore-bulk"), [
                 'ids' => [1, 2, 3],
             ]);
 
@@ -169,7 +170,7 @@ class CrudPackPostmanCommand extends Command
             $items[] = $this->postmanRequest("ForceDelete{$singular}", 'DELETE', $this->apiUrl("{$uri}/:id/force"));
 
             // Force delete bulk => ONLY ids[] body
-            $items[] = $this->postmanRequest("ForceDelete{$singular}Bulk", 'DELETE', $this->apiUrl("{$uri}/force-bulk"), [
+            $items[] = $this->postmanRequest("ForceDeleteBulk{$singular}", 'DELETE', $this->apiUrl("{$uri}/force-bulk"), [
                 'ids' => [1, 2, 3],
             ]);
         }

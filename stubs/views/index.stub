@@ -31,6 +31,10 @@
 @endpush
 
 @section('content')
+@php
+  $hasTrashRoute = \Illuminate\Support\Facades\Route::has('{{ROUTE_NAME}}.trash');
+@endphp
+
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="d-flex align-items-center gap-2">
@@ -46,7 +50,13 @@
       <a href="{{ route('{{ROUTE_NAME}}.create') }}" class="btn btn-success">
         <i class='fa-solid fa-circle-plus'></i> Create
       </a>
-{{DELETED_BUTTON}}
+
+      {{-- Soft-delete UI is activated by routes, not by trait --}}
+      @if($hasTrashRoute)
+        <a href="{{ route('{{ROUTE_NAME}}.trash') }}" class="btn btn-danger">
+          <i class='fa-solid fa-trash-can'></i> Trash ({{ $trashedTotal ?? 0 }})
+        </a>
+      @endif
     </div>
   </div>
 

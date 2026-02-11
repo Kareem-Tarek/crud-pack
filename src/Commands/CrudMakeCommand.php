@@ -2,8 +2,9 @@
 
 // ============================================================================
 // FILE: KareemTarek/CrudPack/Commands/CrudMakeCommand.php
-// UPDATED: ensureSharedTrait() now creates trait only if missing,
-//          never prompts again, and ignores soft mode for trait.
+// UPDATED: Blade stubs are now route-driven (Route::has()).
+//          So we no longer inject: {{DELETED_BUTTON}}, {{DELETE_ICON}},
+//          {{DELETE_TITLE}}, {{DELETE_CONFIRM}}.
 //          (Everything else remains as-is from your pasted version.)
 // ============================================================================
 
@@ -93,18 +94,20 @@ class CrudMakeCommand extends Command
         }
 
         // Wizard mode
-        if (!$allProvided && !$anyExplicitGenerators) {
+       if (!$allProvided && !$anyExplicitGenerators) {
             $this->info('No generation options provided. Answer the following prompts:');
 
+            // Defaults: YES for everything except request/policy (default NO)
             $this->input->setOption('routes', $this->confirm('Append routes automatically?', true));
-            $this->input->setOption('model', $this->confirm('Generate Model?', false));
-            $this->input->setOption('migration', $this->confirm('Generate Migration?', false));
-            $this->input->setOption('request', $this->confirm('Generate Request validation (single FormRequest)?', false));
+            $this->input->setOption('model', $this->confirm('Generate Model?', true));
+            $this->input->setOption('migration', $this->confirm('Generate Migration?', true));
+            $this->input->setOption('request', $this->confirm('Generate Request validation (single FormRequest for store & update)?', false));
             $this->input->setOption('policy', $this->confirm('Generate Policy?', false));
 
             if ($isWeb) {
-                $this->input->setOption('views', $this->confirm('Generate Blade views (Bootstrap 5)?', false));
+                $this->input->setOption('views', $this->confirm('Generate Blade views (Bootstrap 5)?', true));
             } else {
+                // API: views not available
                 $this->input->setOption('views', false);
             }
         }
@@ -266,9 +269,7 @@ class CrudMakeCommand extends Command
             $viewsDir = resource_path("views/{$viewFolder}");
             $this->ensureDir($viewsDir);
 
-            $deletedButton = $soft
-                ? "      <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a>\n"
-                : "      {{-- Soft Deletes disabled: uncomment after enabling routes --}}\n      {{-- <a href=\"{{ route('{$routeName}.trash') }}\" class=\"btn btn-danger\"><i class='fa-solid fa-trash-can'></i> Trash ({{ \$trashedTotal ?? 0 }})</a> --}}\n";
+            // Trash button is now route-driven inside index.stub (Route::has()).
 
             $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
 
@@ -276,11 +277,10 @@ class CrudMakeCommand extends Command
                 stub: $this->stubPath('views/index.stub'),
                 target: "{$viewsDir}/index.blade.php",
                 replacements: [
-                    '{{MODEL_CLASS}}'        => $modelClass,
-                    '{{MODEL_VAR_PLURAL}}'   => $modelVarPlural,
-                    '{{ROUTE_NAME}}'         => $routeName,
-                    '{{DELETED_BUTTON}}'     => $deletedButton,
-                    '{{BULK_DELETE_BLOCK}}'  => $bulkBlock,
+                    '{{MODEL_CLASS}}'       => $modelClass,
+                    '{{MODEL_VAR_PLURAL}}'  => $modelVarPlural,
+                    '{{ROUTE_NAME}}'        => $routeName,
+                    '{{BULK_DELETE_BLOCK}}' => $bulkBlock,
                 ],
                 force: $force,
                 askReplaceIfExists: true
@@ -312,26 +312,15 @@ class CrudMakeCommand extends Command
                 askReplaceIfExists: true
             );
 
-            $showDeleteIcon = $soft
-                ? "<i class='fa-solid fa-trash'></i>"
-                : "<i class='fa-solid fa-skull-crossbones'></i>";
-
-            $showDeleteTitle = $soft ? "Move To Trash" : "Permanently Delete";
-
-            $showDeleteConfirm = $soft
-                ? "return confirm('Move to trash?')"
-                : "return confirm('Permanently delete? This cannot be undone.')";
+            // Delete icon/title/confirm are now route-driven inside show.stub (Route::has()).
 
             $this->generateFromStub(
                 stub: $this->stubPath('views/show.stub'),
                 target: "{$viewsDir}/show.blade.php",
                 replacements: [
-                    '{{MODEL_CLASS}}'    => $modelClass,
-                    '{{MODEL_VAR}}'      => $modelVar,
-                    '{{ROUTE_NAME}}'     => $routeName,
-                    '{{DELETE_ICON}}'    => $showDeleteIcon,
-                    '{{DELETE_TITLE}}'   => $showDeleteTitle,
-                    '{{DELETE_CONFIRM}}' => $showDeleteConfirm,
+                    '{{MODEL_CLASS}}' => $modelClass,
+                    '{{MODEL_VAR}}'   => $modelVar,
+                    '{{ROUTE_NAME}}'  => $routeName,
                 ],
                 force: $force,
                 askReplaceIfExists: true
@@ -407,18 +396,9 @@ class CrudMakeCommand extends Command
             return;
         }
 
-        $reinstall = $this->confirm(
-            "routes/api.php already exists.\nRun `php artisan install:api` anyway? (Laravel will ask before overwriting)\nDefault: NO",
-            false
-        );
-
-        if (!$reinstall) {
-            return;
-        }
-
-        $this->info('Running: php artisan install:api');
-        $this->runInstallApiCommand();
-        $this->cleanupBootstrapAppRoutingApiKey();
+        // routes/api.php exists => API scaffolding is already installed, skip silently.
+        $this->line('routes/api.php already exists. Skipping install:api.');
+        return;
     }
 
     protected function runInstallApiCommand(): void
@@ -681,7 +661,7 @@ PHP;
     protected function generateUniqueMigration(string $table, bool $soft, bool $force): void
     {
         $migrationsDir = database_path('migrations');
-        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*_create_{$table}_table.php";
+        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
         $existing = glob($pattern) ?: [];
 
         $softColumn = $soft
@@ -715,7 +695,7 @@ PHP;
         }
 
         $timestamp = now()->format('Y_m_d_His');
-        $filename = "{$timestamp}_create_{$table}_table.php";
+        $filename = "{$timestamp}create{$table}_table.php";
         $target = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
 
         $this->generateFromStub(
@@ -824,7 +804,7 @@ PHP;
         }
 
         if ($hasBlock) {
-            $pattern = '/' . preg_quote($start, '/') . '.*?' . preg_quote($end, '/') . '\s*/s';
+            $pattern = '/' . preg_quote($start, '/') . '.?' . preg_quote($end, '/') . '\s/s';
             $contents = preg_replace($pattern, $block, $contents);
         } else {
             $contents .= "\n" . $block;
@@ -1085,4 +1065,3 @@ BLADE;
             || $this->optionWasProvided('views');
     }
 }
-

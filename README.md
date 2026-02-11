@@ -45,9 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Some considerations needs to be addressed:
 
 #### API scaffold safety for Laravel 11+
-- When generating ``` --api ``` resources, CrudPack ensures API routing is available (via Laravel’s ``` install:api ```) **only when needed**, and otherwise **asks the developer first** (default answer = **No**).
+- When generating ``` --api ``` resources, CrudPack ensures API routing is available by running Laravel’s php artisan ``` install:api ``` *only if* routes/api.php does not exist.
+- If ``` routes/api.php ``` already exists, CrudPack *skips* running **install:api** silently (no prompt, no overwrite risk). This keeps the API scaffolding a **one-time setup step** per project.
 
-Note: In **Laravel 11+**, the ``` routes/api.php ``` file (and API routing setup) is **not included** / **not registered by default** in a fresh install. It’s basically “optional scaffolding now.”
+- Note (**Laravel 11+**): ``` routes/api.php ``` and API route registration (inside **bootstrap\app.php**) are **not included** or **not registered by default** in a fresh Laravel project install. API routing is now “optional scaffolding”, so the first --api generation may need to scaffold it.
+  - **Sub-Note:** In Laravel 10 and below: The fresh Laravel project install comes automatically with "routes/api.php" and "API route registration" by default
 
 #### Postman collection automation for API resources
 - When generating any ``` --api ``` resource, CrudPack creates ``` postman/CrudPack.postman_collection.json ``` if missing.

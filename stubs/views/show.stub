@@ -31,6 +31,19 @@
 @endpush
 
 @section('content')
+@php
+  // Destroy always exists, but the "meaning" (trash vs permanent) depends on whether trash routes exist.
+  $softMode = \Illuminate\Support\Facades\Route::has('{{ROUTE_NAME}}.trash');
+
+  $deleteTitle = $softMode ? 'Move To Trash' : 'Permanently Delete';
+  $deleteConfirm = $softMode
+    ? "return confirm('Move to trash?')"
+    : "return confirm('Permanently delete? This cannot be undone.')";
+  $deleteIcon = $softMode
+    ? "<i class='fa-solid fa-trash'></i>"
+    : "<i class='fa-solid fa-skull-crossbones'></i>";
+@endphp
+
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h4 m-0">Show {{MODEL_CLASS}}</h1>
@@ -71,9 +84,9 @@
       @csrf
       @method('DELETE')
       <button class="btn btn-lg btn-outline-danger"
-              title="{{DELETE_TITLE}}"
-              onclick="{{DELETE_CONFIRM}}">
-        {{DELETE_ICON}}
+              title="{{ $deleteTitle }}"
+              onclick="{{ $deleteConfirm }}">
+        {!! $deleteIcon !!}
       </button>
     </form>
   </div>
