@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Form request (store + update)
   - Policy
   - Blade views (Web only)
+    - Ready-blades with responsive design for the CRUD operations for any created resource with also a ready-logic within those blades UI/UX is handled
+    - Displaying the total count of the rows per resource in the Ready-blades (e.g., Products (73), Trashed (18), etc.)
     - Added placeholder authentication section in ``` resources/views/layouts/navigation.blade.php ``` [including authenticated user and unauthenticated user (guest)]. They’re currently commented out to support projects without authentication. If authentication is later added (e.g., Breeze or Jetstream with Fortify, UI, custom authentication, etc.), you can simply uncomment them.
   - Ready-blade pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
 - Shared delete-handling trait generated once per application
@@ -30,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Force delete (single & bulk)
 - Bulk delete support
 - Blueprint-first design (no hidden logic, no magic)
-- Bootstrap 5–based Blade views (ready-blades with responsive design for the CRUD operations for any created resource with also a ready-logic within those blades UI/UX is handled)
+- Bootstrap 5–based Blade views
 - Interactive wizard mode
 - Full Laravel naming convention compliance
 - Compatibility with PHP 8.0+ and Laravel 8.0+
@@ -174,6 +176,11 @@ The resource name is the foundation of everything CRUD Pack generates and must s
 - Must be singular
 - Must be StudlyCase
 - Must NOT include suffixes like Controller, Model, Request, etc.
+
+- **Valid examples:** 
+  - Department
+  - Product
+  - Car
 
 ### Valid Examples ✅
 ```bash
