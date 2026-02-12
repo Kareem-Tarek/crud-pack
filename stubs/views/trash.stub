@@ -27,6 +27,11 @@
 
   .flash-alert.is-ltr .close-x{ right: .5rem; }
   .flash-alert.is-rtl .close-x{ left: .5rem; }
+
+  .crud-search-wrap{
+    max-width: 420px;
+    width: 100%;
+  }
 </style>
 @endpush
 
@@ -60,20 +65,23 @@
     </a>
   </div>
 
-  {{-- Search --}}
-  <div class="mb-3">
-    <input
-      type="text"
-      class="form-control"
-      id="crudTrashSearch"
-      placeholder="Search trashed by ID or Name..."
-      value="{{ request('q') }}"
-      autocomplete="off"
-      {{ $softRoutesOk ? '' : 'disabled' }}
-    >
-    <div class="form-text text-muted">
-      Searches across all trashed pages (server-side).
+  {{-- Search bar (AJAX only starts when typing) --}}
+  <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+    <div class="crud-search-wrap">
+      <input
+        type="text"
+        id="crudTrashSearchInput"
+        class="form-control"
+        placeholder="Search trashed {{MODEL_CLASS}}..."
+        autocomplete="off"
+        {{ $softRoutesOk ? '' : 'disabled' }}
+      >
+      <small class="text-muted d-block mt-1">
+        Type to search across all trashed records. Clear to return to normal trash list.
+      </small>
     </div>
+
+    <div id="crudTrashSearchStatus" class="text-muted small"></div>
   </div>
 
   @if(!$softRoutesOk)
@@ -91,125 +99,117 @@
               class="close-x"
               aria-label="Close"
               data-bs-dismiss="alert">×</button>
+      {{-- BS4: change data-bs-dismiss to data-dismiss --}}
     </div>
   @endif
 
-  {{-- AJAX target --}}
-  <div id="trashResults">
-    @yield('crud_results')
+  {{-- EVERYTHING that gets replaced by trash-search lives inside this wrapper --}}
+  <div id="crudTrashResults">
+    {{-- Bulk Actions Toolbar (NOT wrapping table) --}}
+    <div class="card mb-3">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="selectAllTrashed" {{ $softRoutesOk ? '' : 'disabled' }}>
+          <label class="form-check-label" for="selectAllTrashed">Select All</label>
+        </div>
+
+        <div class="d-flex gap-2">
+          {{BLADE_CAN_RESTORE_BULK_BEGIN}}
+          <button type="button" class="btn btn-outline-success" id="bulkRestoreBtn" disabled>
+            Restore (Selected)
+          </button>
+          {{BLADE_CAN_RESTORE_BULK_END}}
+
+          {{BLADE_CAN_FORCE_DELETE_BULK_BEGIN}}
+          <button type="button" class="btn btn-outline-danger" id="bulkForceBtn" disabled>
+            Permanently Delete (Selected)
+          </button>
+          {{BLADE_CAN_FORCE_DELETE_BULK_END}}
+        </div>
+      </div>
+    </div>
+
+    {{-- Hidden bulk form --}}
+    <form id="bulkTrashedForm" method="POST" action="">
+      @csrf
+      <input type="hidden" name="ids" id="trashedIds" value="">
+    </form>
+
+    {{-- Table (no wrapping form => row forms are safe) --}}
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th style="width:50px;"></th>
+              <th style="width:90px;">ID</th>
+              <th>Name</th>
+              <th>Deleted At</th>
+              <th style="width:320px;" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($items as $item)
+              <tr>
+                <td>
+                  <input class="form-check-input row-check-trashed" type="checkbox" value="{{ $item->id }}" {{ $softRoutesOk ? '' : 'disabled' }}>
+                </td>
+                <td>{{ $item->id }}</td>
+                <td>{{ $item->name ?? '-' }}</td>
+                @php
+                  $tz = env('DISPLAY_TIMEZONE') ?: 'Africa/Cairo';
+                @endphp
+                <td>{{ $item->deleted_at?->timezone($tz)->format('d-m-Y | h:i A') ?? '' }}</td>
+                <td class="text-end">
+                  @if($softRoutesOk)
+                    {{BLADE_CAN_RESTORE_BEGIN}}
+                    <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
+                      @csrf
+                      <button type="submit" title="Restore" class="btn btn-md btn-outline-success"
+                        onclick="return confirm('Restore?')">
+                        <i class='fa-solid fa-trash-arrow-up'></i>
+                      </button>
+                    </form>
+                    {{BLADE_CAN_RESTORE_END}}
+
+                    {{BLADE_CAN_FORCE_DELETE_BEGIN}}
+                    <form method="POST" action="{{ route('{{ROUTE_NAME}}.forceDelete', $item->id) }}" class="d-inline">
+                      @csrf
+                      @method('DELETE')
+                      <button type="submit" title="Permanently delete" class="btn btn-md btn-outline-danger"
+                        onclick="return confirm('Permanently delete?')">
+                        <i class='fa-solid fa-skull-crossbones'></i>
+                      </button>
+                    </form>
+                    {{BLADE_CAN_FORCE_DELETE_END}}
+                  @else
+                    <span class="text-muted small">Soft routes disabled</span>
+                  @endif
+                </td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">No trashed records.</td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {{-- Optional: showing range for current page --}}
+    @if($items->count())
+      <div class="text-muted small mt-3">
+        Showing {{ $items->firstItem() }}–{{ $items->lastItem() }}
+        of {{ $items->total() }} trashed
+      </div>
+    @endif
+
+    <div class="mt-3">
+      {{ $items->links('vendor.pagination.bootstrap-5') }}
+    </div>
   </div>
 </div>
-@endsection
-
-@section('crud_results')
-  {{-- Optional: filtered count --}}
-  <div class="text-muted small mb-2">
-    Results: {{ $filteredTotal ?? ($items->total() ?? 0) }}
-  </div>
-
-  {{-- Bulk Actions Toolbar (NOT wrapping table) --}}
-  <div class="card mb-3">
-    <div class="card-body d-flex justify-content-between align-items-center">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="selectAllTrashed" {{ $softRoutesOk ? '' : 'disabled' }}>
-        <label class="form-check-label" for="selectAllTrashed">Select All</label>
-      </div>
-
-      <div class="d-flex gap-2">
-        {{BLADE_CAN_RESTORE_BULK_BEGIN}}
-        <button type="button" class="btn btn-outline-success" id="bulkRestoreBtn" disabled>
-          Restore (Selected)
-        </button>
-        {{BLADE_CAN_RESTORE_BULK_END}}
-
-        {{BLADE_CAN_FORCE_DELETE_BULK_BEGIN}}
-        <button type="button" class="btn btn-outline-danger" id="bulkForceBtn" disabled>
-          Permanently Delete (Selected)
-        </button>
-        {{BLADE_CAN_FORCE_DELETE_BULK_END}}
-      </div>
-    </div>
-  </div>
-
-  {{-- Hidden bulk form --}}
-  <form id="bulkTrashedForm" method="POST" action="">
-    @csrf
-    <input type="hidden" name="ids" id="trashedIds" value="">
-  </form>
-
-  {{-- Table (no wrapping form => row forms are safe) --}}
-  <div class="card">
-    <div class="table-responsive">
-      <table class="table table-striped table-hover mb-0 align-middle">
-        <thead>
-          <tr>
-            <th style="width:50px;"></th>
-            <th style="width:90px;">ID</th>
-            <th>Name</th>
-            <th>Deleted At</th>
-            <th style="width:320px;" class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse($items as $item)
-            <tr>
-              <td>
-                <input class="form-check-input row-check-trashed" type="checkbox" value="{{ $item->id }}" {{ $softRoutesOk ? '' : 'disabled' }}>
-              </td>
-              <td>{{ $item->id }}</td>
-              <td>{{ $item->name ?? '-' }}</td>
-              @php
-                $tz = env('DISPLAY_TIMEZONE') ?: 'Africa/Cairo';
-              @endphp
-              <td>{{ $item->deleted_at?->timezone($tz)->format('d-m-Y | h:i A') ?? '' }}</td>
-              <td class="text-end">
-                @if($softRoutesOk)
-                  {{BLADE_CAN_RESTORE_BEGIN}}
-                  <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
-                    @csrf
-                    <button type="submit" title="Restore" class="btn btn-md btn-outline-success"
-                      onclick="return confirm('Restore?')">
-                      <i class='fa-solid fa-trash-arrow-up'></i>
-                    </button>
-                  </form>
-                  {{BLADE_CAN_RESTORE_END}}
-
-                  {{BLADE_CAN_FORCE_DELETE_BEGIN}}
-                  <form method="POST" action="{{ route('{{ROUTE_NAME}}.forceDelete', $item->id) }}" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" title="Permanently delete" class="btn btn-md btn-outline-danger"
-                      onclick="return confirm('Permanently delete?')">
-                      <i class='fa-solid fa-skull-crossbones'></i>
-                    </button>
-                  </form>
-                  {{BLADE_CAN_FORCE_DELETE_END}}
-                @else
-                  <span class="text-muted small">Soft routes disabled</span>
-                @endif
-              </td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="5" class="text-center text-muted py-4">No trashed records.</td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  {{-- Optional: showing range for current page --}}
-  @if($items->count())
-    <div class="text-muted small mt-3">
-      Showing {{ $items->firstItem() }}–{{ $items->lastItem() }}
-      of {{ $items->total() }} trashed
-    </div>
-  @endif
-
-  <div class="mt-3">
-    {{ $items->links('vendor.pagination.bootstrap-5') }}
-  </div>
 @endsection
 
 @push('scripts')
@@ -218,17 +218,13 @@
   const softRoutesOk = {{ $softRoutesOk ? 'true' : 'false' }};
   if (!softRoutesOk) return;
 
-  const input = document.getElementById('crudTrashSearch');
-  const results = document.getElementById('trashResults');
+  // ==========
+  // Bulk logic initializer (so it works after AJAX replacement or restore)
+  // ==========
+  function initTrashBulk() {
+    const restoreBulkUrl = @json($restoreBulkUrl);
+    const forceBulkUrl   = @json($forceBulkUrl);
 
-  function withAjaxHeader() {
-    return {
-      'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'text/html'
-    };
-  }
-
-  function initTrashBulkUI() {
     const selectAll = document.getElementById('selectAllTrashed');
     const checks = Array.from(document.querySelectorAll('.row-check-trashed'));
     const restoreBtn = document.getElementById('bulkRestoreBtn');
@@ -237,8 +233,7 @@
     const bulkForm = document.getElementById('bulkTrashedForm');
     const idsInput = document.getElementById('trashedIds');
 
-    const restoreBulkUrl = @json($restoreBulkUrl);
-    const forceBulkUrl   = @json($forceBulkUrl);
+    if (!selectAll || !bulkForm || !idsInput) return;
 
     function selectedIds() {
       return checks.filter(c => c.checked).map(c => c.value);
@@ -252,20 +247,24 @@
       if (forceBtn) forceBtn.disabled = !anyChecked;
 
       const allChecked = checks.length > 0 && ids.length === checks.length;
-      if (selectAll) {
-        selectAll.checked = allChecked;
-        selectAll.indeterminate = anyChecked && !allChecked;
-      }
+      selectAll.checked = allChecked;
+      selectAll.indeterminate = anyChecked && !allChecked;
     }
 
-    if (selectAll) {
-      selectAll.addEventListener('change', function () {
-        checks.forEach(c => c.checked = selectAll.checked);
-        syncState();
-      });
-    }
+    // Remove previous listeners safely by cloning nodes (simple & reliable)
+    const selectAllClone = selectAll.cloneNode(true);
+    selectAll.parentNode.replaceChild(selectAllClone, selectAll);
 
-    checks.forEach(c => c.addEventListener('change', syncState));
+    selectAllClone.addEventListener('change', function () {
+      checks.forEach(c => c.checked = selectAllClone.checked);
+      syncState();
+    });
+
+    checks.forEach(c => {
+      const clone = c.cloneNode(true);
+      c.parentNode.replaceChild(clone, c);
+      clone.addEventListener('change', syncState);
+    });
 
     function submitBulk(url, method, confirmMsg) {
       const ids = selectedIds();
@@ -291,13 +290,17 @@
     }
 
     if (restoreBtn) {
-      restoreBtn.addEventListener('click', () =>
+      const restoreClone = restoreBtn.cloneNode(true);
+      restoreBtn.parentNode.replaceChild(restoreClone, restoreBtn);
+      restoreClone.addEventListener('click', () =>
         submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
       );
     }
 
     if (forceBtn) {
-      forceBtn.addEventListener('click', () =>
+      const forceClone = forceBtn.cloneNode(true);
+      forceBtn.parentNode.replaceChild(forceClone, forceBtn);
+      forceClone.addEventListener('click', () =>
         submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
       );
     }
@@ -305,67 +308,89 @@
     syncState();
   }
 
-  // First init
-  initTrashBulkUI();
+  // Init once for normal page load
+  initTrashBulk();
 
-  // AJAX search + pagination
-  if (!input || !results) return;
+  // ==========
+  // AJAX search behavior
+  // ==========
+  const input  = document.getElementById('crudTrashSearchInput');
+  const wrap   = document.getElementById('crudTrashResults');
+  const status = document.getElementById('crudTrashSearchStatus');
 
-  let timer = null;
-  let controller = null;
+  if (!input || !wrap) return;
 
-  function setQueryInUrl(q) {
-    const url = new URL(window.location.href);
-    if (q && q.trim() !== '') url.searchParams.set('q', q.trim());
-    else url.searchParams.delete('q');
-    url.searchParams.delete('page');
-    window.history.replaceState({}, '', url.toString());
+  const initialHtml = wrap.innerHTML;
+
+  // Replace this with your real trash-search route name (already implemented on your side)
+  // Must return HTML snippet for #crudTrashResults content.
+  const SEARCH_URL = @json(route('{{ROUTE_NAME}}.trashSearch'));
+
+  let t = null;
+  let lastQuery = '';
+
+  function setStatus(msg) {
+    if (status) status.textContent = msg || '';
   }
 
-  function buildUrl(pageUrl) {
-    const url = new URL(pageUrl || window.location.href);
-    const q = input.value.trim();
-    if (q) url.searchParams.set('q', q);
-    else url.searchParams.delete('q');
-    return url.toString();
+  function restoreInitial() {
+    wrap.innerHTML = initialHtml;
+    setStatus('');
+    initTrashBulk();
   }
 
-  async function load(url) {
-    if (controller) controller.abort();
-    controller = new AbortController();
+  async function doSearch(q) {
+    const queryAtCall = q;
+    setStatus('Searching...');
 
-    const res = await fetch(url, {
-      headers: withAjaxHeader(),
-      signal: controller.signal
-    });
+    const url = new URL(SEARCH_URL, window.location.origin);
+    url.searchParams.set('q', q);
 
-    if (!res.ok) return;
+    try {
+      const res = await fetch(url.toString(), {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html',
+        },
+        credentials: 'same-origin'
+      });
 
-    const html = await res.text();
-    results.innerHTML = html;
+      if (!res.ok) throw new Error('Request failed: ' + res.status);
 
-    // re-init bulk UI listeners after HTML replacement
-    initTrashBulkUI();
+      const html = await res.text();
+
+      // ignore stale response
+      if (input.value.trim() !== queryAtCall) return;
+
+      wrap.innerHTML = html;
+      setStatus('');
+      initTrashBulk();
+    } catch (e) {
+      if (input.value.trim() !== queryAtCall) return;
+      setStatus('Search failed. Please try again.');
+      wrap.innerHTML = initialHtml;
+      initTrashBulk();
+    }
   }
 
   input.addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      const q = input.value;
-      setQueryInUrl(q);
-      load(buildUrl(window.location.href));
+    const q = (input.value || '').trim();
+
+    if (!q) {
+      lastQuery = '';
+      if (t) clearTimeout(t);
+      restoreInitial();
+      return;
+    }
+
+    if (t) clearTimeout(t);
+    t = setTimeout(() => {
+      if (q === lastQuery) return;
+      lastQuery = q;
+      doSearch(q);
     }, 250);
   });
 
-  results.addEventListener('click', function (e) {
-    const a = e.target.closest('a');
-    if (!a) return;
-    if (!a.closest('.pagination')) return;
-
-    e.preventDefault();
-    load(buildUrl(a.href));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
 })();
 </script>
 @endpush

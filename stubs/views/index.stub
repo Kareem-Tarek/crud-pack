@@ -27,6 +27,12 @@
 
   .flash-alert.is-ltr .close-x{ right: .5rem; }
   .flash-alert.is-rtl .close-x{ left: .5rem; }
+
+  /* Search */
+  .crud-search-wrap{
+    max-width: 420px;
+    width: 100%;
+  }
 </style>
 @endpush
 
@@ -53,6 +59,7 @@
       </a>
       {{BLADE_CAN_CREATE_END}}
 
+      {{-- Soft-delete UI is activated by routes, not by trait --}}
       @if($hasTrashRoute)
         {{BLADE_CAN_TRASH_BEGIN}}
         <a href="{{ route('{{ROUTE_NAME}}.trash') }}" class="btn btn-danger">
@@ -63,19 +70,22 @@
     </div>
   </div>
 
-  {{-- Search --}}
-  <div class="mb-3">
-    <input
-      type="text"
-      class="form-control"
-      id="crudSearch"
-      placeholder="Search by ID or Name..."
-      value="{{ request('q') }}"
-      autocomplete="off"
-    >
-    <div class="form-text text-muted">
-      Searches across all pages (server-side).
+  {{-- Search bar (AJAX only starts when typing) --}}
+  <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+    <div class="crud-search-wrap">
+      <input
+        type="text"
+        id="crudSearchInput"
+        class="form-control"
+        placeholder="Search {{MODEL_CLASS}}..."
+        autocomplete="off"
+      >
+      <small class="text-muted d-block mt-1">
+        Type to search across all records. Clear to return to normal list.
+      </small>
     </div>
+
+    <div id="crudSearchStatus" class="text-muted small"></div>
   </div>
 
   @if(session('success'))
@@ -87,119 +97,116 @@
               class="close-x"
               aria-label="Close"
               data-bs-dismiss="alert">×</button>
+      {{-- BS4: change data-bs-dismiss to data-dismiss --}}
     </div>
   @endif
 
-  {{-- AJAX target --}}
+  {{-- EVERYTHING that gets replaced by search lives inside this wrapper --}}
   <div id="crudResults">
-    @yield('crud_results')
+    {{BULK_DELETE_BLOCK}}
+
+    {{-- Optional: showing range for current page --}}
+    @if(${{MODEL_VAR_PLURAL}}->count())
+      <div class="text-muted small mt-3">
+        Showing {{ ${{MODEL_VAR_PLURAL}}->firstItem() }}–{{ ${{MODEL_VAR_PLURAL}}->lastItem() }}
+        of {{ ${{MODEL_VAR_PLURAL}}->total() }}
+      </div>
+    @endif
+
+    <div class="mt-3">
+      {{ ${{MODEL_VAR_PLURAL}}->links('vendor.pagination.bootstrap-5') }}
+    </div>
   </div>
 </div>
-@endsection
-
-@section('crud_results')
-  {{-- Optional: filtered count --}}
-  <div class="text-muted small mb-2">
-    Results: {{ $filteredTotal ?? (${{MODEL_VAR_PLURAL}}->total() ?? 0) }}
-  </div>
-
-  {{BULK_DELETE_BLOCK}}
-
-  {{-- Optional: showing range for current page --}}
-  @if(${{MODEL_VAR_PLURAL}}->count())
-    <div class="text-muted small mt-3">
-      Showing {{ ${{MODEL_VAR_PLURAL}}->firstItem() }}–{{ ${{MODEL_VAR_PLURAL}}->lastItem() }}
-      of {{ ${{MODEL_VAR_PLURAL}}->total() }}
-    </div>
-  @endif
-
-  <div class="mt-3">
-    {{ ${{MODEL_VAR_PLURAL}}->links('vendor.pagination.bootstrap-5') }}
-  </div>
 @endsection
 
 @push('scripts')
 <script>
 (function () {
-  const input = document.getElementById('crudSearch');
-  const results = document.getElementById('crudResults');
-  if (!input || !results) return;
+  const input  = document.getElementById('crudSearchInput');
+  const wrap   = document.getElementById('crudResults');
+  const status = document.getElementById('crudSearchStatus');
 
-  let timer = null;
-  let controller = null;
+  if (!input || !wrap) return;
 
-  function withAjaxHeader() {
-    return {
-      'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'text/html'
-    };
+  // IMPORTANT: this is the ORIGINAL HTML rendered by index() on first load
+  const initialHtml = wrap.innerHTML;
+
+  // Replace this with your real search route name (already implemented on your side)
+  // Must return HTML snippet for #crudResults content.
+  const SEARCH_URL = @json(route('{{ROUTE_NAME}}.search'));
+
+  let t = null;
+  let lastQuery = '';
+  let isSearching = false;
+
+  function setStatus(msg) {
+    if (status) status.textContent = msg || '';
   }
 
-  function setQueryInUrl(q) {
-    const url = new URL(window.location.href);
-    if (q && q.trim() !== '') url.searchParams.set('q', q.trim());
-    else url.searchParams.delete('q');
-    url.searchParams.delete('page'); // reset
-    window.history.replaceState({}, '', url.toString());
+  function restoreInitial() {
+    wrap.innerHTML = initialHtml;
+    setStatus('');
+    isSearching = false;
+    // No need to re-init index bulk script if it uses delegation.
+    // If yours uses direct bindings, tell me and I’ll adjust.
   }
 
-  // NOTE: when we replace HTML with innerHTML, script tags won't auto-run in many browsers.
-  // So we re-run inline scripts inside the updated fragment (needed for bulk delete block).
-  function runInlineScripts(container) {
-    const scripts = Array.from(container.querySelectorAll('script'));
-    scripts.forEach(s => {
-      const n = document.createElement('script');
-      if (s.type) n.type = s.type;
-      n.text = s.text || s.textContent || '';
-      document.body.appendChild(n);
-      document.body.removeChild(n);
-    });
-  }
+  async function doSearch(q) {
+    // If user cleared while request in-flight, ignore results.
+    const queryAtCall = q;
 
-  async function load(url) {
-    if (controller) controller.abort();
-    controller = new AbortController();
+    isSearching = true;
+    setStatus('Searching...');
 
-    const res = await fetch(url, {
-      headers: withAjaxHeader(),
-      signal: controller.signal
-    });
+    const url = new URL(SEARCH_URL, window.location.origin);
+    url.searchParams.set('q', q);
 
-    if (!res.ok) return;
+    try {
+      const res = await fetch(url.toString(), {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html',
+        },
+        credentials: 'same-origin'
+      });
 
-    const html = await res.text();
-    results.innerHTML = html;
-    runInlineScripts(results);
-  }
+      if (!res.ok) throw new Error('Request failed: ' + res.status);
 
-  function buildUrl(pageUrl) {
-    const url = new URL(pageUrl || window.location.href);
-    const q = input.value.trim();
-    if (q) url.searchParams.set('q', q);
-    else url.searchParams.delete('q');
-    return url.toString();
+      const html = await res.text();
+
+      // ignore stale response
+      if (input.value.trim() !== queryAtCall) return;
+
+      wrap.innerHTML = html;
+      setStatus('');
+    } catch (e) {
+      if (input.value.trim() !== queryAtCall) return;
+      setStatus('Search failed. Please try again.');
+      // keep old view; do not blank user UI
+      wrap.innerHTML = initialHtml;
+      isSearching = false;
+    }
   }
 
   input.addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      const q = input.value;
-      setQueryInUrl(q);
-      load(buildUrl(window.location.href));
+    const q = (input.value || '').trim();
+
+    // If cleared => restore ORIGINAL view instantly
+    if (!q) {
+      lastQuery = '';
+      if (t) clearTimeout(t);
+      restoreInitial();
+      return;
+    }
+
+    // Debounce
+    if (t) clearTimeout(t);
+    t = setTimeout(() => {
+      if (q === lastQuery && isSearching) return;
+      lastQuery = q;
+      doSearch(q);
     }, 250);
-  });
-
-  // Intercept pagination clicks inside results
-  results.addEventListener('click', function (e) {
-    const a = e.target.closest('a');
-    if (!a) return;
-
-    // only intercept pagination links
-    if (!a.closest('.pagination')) return;
-
-    e.preventDefault();
-    load(buildUrl(a.href));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 })();
 </script>
