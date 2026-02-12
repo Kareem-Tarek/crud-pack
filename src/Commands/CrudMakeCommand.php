@@ -676,51 +676,39 @@ PHP;
     {
         $migrationsDir = database_path('migrations');
 
-        // Support BOTH naming styles:
-        // - Laravel standard: 2026_02_11_035107_create_employees_table.php
-        // - Old buggy style:  2026_02_12_192004createemployees_table.php
-        $patterns = [
-            $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php",
-            $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php",
-        ];
+        // Laravel default: YYYY_MM_DD_HHMMSS_create_employees_table.php
+        $laravelPattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
 
-        $existing = [];
-        foreach ($patterns as $p) {
-            $hits = glob($p) ?: [];
-            foreach ($hits as $f) {
-                $existing[] = $f;
-            }
-        }
+        // Legacy buggy format we used before: YYYY_MM_DD_HHMMSScreateemployees_table.php
+        $legacyPattern  = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
 
-        // de-dup + sort so we can pick the newest filename (timestamp prefix sorts lexicographically)
-        $existing = array_values(array_unique($existing));
-        sort($existing);
+        $laravelExisting = glob($laravelPattern) ?: [];
+        $legacyExisting  = glob($legacyPattern) ?: [];
+
+        // Prefer the proper Laravel-named migration if it exists
+        $existing = !empty($laravelExisting) ? $laravelExisting : $legacyExisting;
 
         $softColumn = $soft
             ? "            \$table->softDeletes();\n"
             : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
 
-        // ✅ If exists => overwrite (force) or prompt (no force)
         if (!empty($existing)) {
-            // pick the most recent (last after sort)
-            $target = $existing[count($existing) - 1];
-
-            // if multiple exist, warn (still overwrite the newest)
-            if (count($existing) > 1) {
-                $this->warn("Multiple migrations found for [{$table}]. Will use: " . basename($target));
-            }
+            sort($existing);              // stable order
+            $target = end($existing);     // pick the latest match
 
             if (!$force) {
                 $replace = $this->confirm(
                     "Migration for [{$table}] already exists (" . basename($target) . "). Replace it?",
                     false
                 );
+
                 if (!$replace) {
                     $this->warn("Skipped migration for [{$table}].");
                     return;
                 }
             }
 
+            // Overwrite the existing migration file (force OR confirmed prompt)
             $this->generateFromStub(
                 stub: $this->stubPath('migrations/create_table.stub'),
                 target: $target,
@@ -736,10 +724,10 @@ PHP;
             return;
         }
 
-        // ✅ If not exists => create with Laravel-standard filename
+        // If no migration exists, create it using Laravel naming convention
         $timestamp = now()->format('Y_m_d_His');
-        $filename = "{$timestamp}create{$table}_table.php";
-        $target = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
+        $filename  = "{$timestamp}create{$table}_table.php";
+        $target    = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
 
         $this->generateFromStub(
             stub: $this->stubPath('migrations/create_table.stub'),
