@@ -303,12 +303,12 @@ If the developer:
 - and does not explicitly pass any optional generator flags
 
 CRUD Pack enters **wizard mode** and prompts the developer with yes/no questions:
-- Generate routes?
-- Generate model?
-- Generate migration?
-- Generate request validation?
-- Generate policy?
-- Generate views? (Web only)
+- Generate routes? (default: yes)
+- Generate model? (default: yes)
+- Generate migration? (default: yes)
+- Generate request validation? (default: no — **some developers prefer handling validation inside controllers or via custom patterns**)
+- Generate policy? (default: no — **authorization approaches vary and may be custom and that depends on the developer's deceison**)
+- Generate views? (web only; default: yes)
 
 If the controller type is API, the views prompt is **never shown**.
 
