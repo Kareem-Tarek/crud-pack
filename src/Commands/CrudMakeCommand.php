@@ -675,18 +675,46 @@ PHP;
     protected function generateUniqueMigration(string $table, bool $soft, bool $force): void
     {
         $migrationsDir = database_path('migrations');
-        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
-        $existing = glob($pattern) ?: [];
+
+        // Support BOTH naming styles:
+        // - Laravel standard: 2026_02_11_035107_create_employees_table.php
+        // - Old buggy style:  2026_02_12_192004createemployees_table.php
+        $patterns = [
+            $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php",
+            $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php",
+        ];
+
+        $existing = [];
+        foreach ($patterns as $p) {
+            $hits = glob($p) ?: [];
+            foreach ($hits as $f) {
+                $existing[] = $f;
+            }
+        }
+
+        // de-dup + sort so we can pick the newest filename (timestamp prefix sorts lexicographically)
+        $existing = array_values(array_unique($existing));
+        sort($existing);
 
         $softColumn = $soft
             ? "            \$table->softDeletes();\n"
             : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
 
+        // ✅ If exists => overwrite (force) or prompt (no force)
         if (!empty($existing)) {
-            $target = $existing[0];
+            // pick the most recent (last after sort)
+            $target = $existing[count($existing) - 1];
+
+            // if multiple exist, warn (still overwrite the newest)
+            if (count($existing) > 1) {
+                $this->warn("Multiple migrations found for [{$table}]. Will use: " . basename($target));
+            }
 
             if (!$force) {
-                $replace = $this->confirm("Migration for [{$table}] already exists (" . basename($target) . "). Replace it?", false);
+                $replace = $this->confirm(
+                    "Migration for [{$table}] already exists (" . basename($target) . "). Replace it?",
+                    false
+                );
                 if (!$replace) {
                     $this->warn("Skipped migration for [{$table}].");
                     return;
@@ -708,6 +736,7 @@ PHP;
             return;
         }
 
+        // ✅ If not exists => create with Laravel-standard filename
         $timestamp = now()->format('Y_m_d_His');
         $filename = "{$timestamp}create{$table}_table.php";
         $target = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
