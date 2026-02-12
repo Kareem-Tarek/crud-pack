@@ -124,7 +124,7 @@ The goal is **speed without sacrificing control**.
 
 - **PHP:** 8.0 or higher
 - **Laravel:** 8.0 or higher 
-  - Developed and tested on **Laravel 12**
+  - Developed and tested on **PHP 8.4.17 (NTS)** & **Laravel 12**
   - Fully compatible with Laravel 8.0+
 
 ---
