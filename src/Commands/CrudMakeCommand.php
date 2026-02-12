@@ -676,25 +676,18 @@ PHP;
     {
         $migrationsDir = database_path('migrations');
 
-        // Laravel default: YYYY_MM_DD_HHMMSS_create_employees_table.php
-        $laravelPattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
-
-        // Legacy buggy format we used before: YYYY_MM_DD_HHMMSScreateemployees_table.php
-        $legacyPattern  = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
-
-        $laravelExisting = glob($laravelPattern) ?: [];
-        $legacyExisting  = glob($legacyPattern) ?: [];
-
-        // Prefer the proper Laravel-named migration if it exists
-        $existing = !empty($laravelExisting) ? $laravelExisting : $legacyExisting;
+        // Laravel convention: *create<table>_table.php
+        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
+        $existing = glob($pattern) ?: [];
 
         $softColumn = $soft
             ? "            \$table->softDeletes();\n"
             : "            // \$table->softDeletes(); // Uncomment to enable soft deletes\n";
 
+        // If exists -> overwrite (force) or prompt (no force)
         if (!empty($existing)) {
-            sort($existing);              // stable order
-            $target = end($existing);     // pick the latest match
+            sort($existing);
+            $target = end($existing);
 
             if (!$force) {
                 $replace = $this->confirm(
@@ -708,7 +701,6 @@ PHP;
                 }
             }
 
-            // Overwrite the existing migration file (force OR confirmed prompt)
             $this->generateFromStub(
                 stub: $this->stubPath('migrations/create_table.stub'),
                 target: $target,
@@ -724,9 +716,9 @@ PHP;
             return;
         }
 
-        // If no migration exists, create it using Laravel naming convention
+        // Not exists -> create ONE migration using Laravel name
         $timestamp = now()->format('Y_m_d_His');
-        $filename  = "{$timestamp}create{$table}_table.php";
+        $filename  = "{$timestamp}_create_{$table}_table.php";
         $target    = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
 
         $this->generateFromStub(
