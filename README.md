@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Blade views (Web only)
     - Ready-blades with responsive design for the CRUD operations for any created resource with also a ready-logic within those blades UI/UX is handled
     - Displaying the total count of the rows per resource in the Ready-blades (e.g., Products (73), Trashed (18), etc.)
+    - The blades are **fully dynamic per resource**, they **respect policy-style** (authorization style) automatically
+      - Blades: ``` index ```, ``` show ```, ``` create ```, ``` edit ```, ``` trash ```
+      - Authorization styles: ``` none ``` (default), ``` authorize ```, ``` gate ```, ``` resource ```
     - Added placeholder authentication section in ``` resources/views/layouts/navigation.blade.php ``` [including authenticated user and unauthenticated user (guest)]. They’re currently commented out to support projects without authentication. If authentication is later added (e.g., Breeze or Jetstream with Fortify, UI, custom authentication, etc.), you can simply uncomment them.
   - Ready-blade pagination components (Bootstrap 5, Bootstrap 4, tailwind, default, etc.)
 - Shared delete-handling trait generated once per application

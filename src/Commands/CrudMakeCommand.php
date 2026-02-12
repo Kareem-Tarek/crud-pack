@@ -433,8 +433,7 @@ class CrudMakeCommand extends Command
 
         $content = $this->files->get($path);
 
-        // NOTE: your pasted version contains DIR instead of _DIR_ intentionally.
-        if (substr_count($content, "api: DIR.'/../routes/api.php'") <= 1) {
+        if (substr_count($content, "api: __DIR__.'/../routes/api.php'") <= 1) {
             return;
         }
 
@@ -460,11 +459,11 @@ class CrudMakeCommand extends Command
 
             if ($inWithRouting) {
                 $isApiLine = (bool) preg_match(
-                    "/^\s*api\s*:\s*DIR\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
+                    "/^\s*api\s*:\s*__DIR__\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
                     $line
                 );
 
-                if (!$isApiLine && str_contains($line, "api: DIR.'/../routes/api.php'")) {
+                if (!$isApiLine && str_contains($line, "api: __DIR__.'/../routes/api.php'")) {
                     $isApiLine = true;
                 }
 
@@ -1127,7 +1126,7 @@ BLADE;
      ============================================================ */
     protected function stubPath(string $relative): string
     {
-        return DIR . '/../../stubs/' . $relative;
+        return __DIR__ . '/../../stubs/' . $relative;
     }
 
     protected function generateFromStub(
