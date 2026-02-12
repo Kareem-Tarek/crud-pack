@@ -1,6 +1,6 @@
 {
   "name": "kareemtarek/crud-pack",
-  "description": "Reusable Laravel CRUD generator [controllers (web/api), requests, models, migrations, policies, views, routes, postman api collection (from api routes)].",
+  "description": "Reusable Laravel CRUD generator → controllers (web/api), requests (validations), models, migrations, policies, views, routes, postman api collection (from api routes).",
   "type": "library",
   "license": "MIT",
   "authors": [
