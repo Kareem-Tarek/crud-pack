@@ -1,5 +1,12 @@
 <?php
 
+// ============================================================================
+// FILE: stubs/policies/policy.stub
+// UPDATED:
+// - Always includes deleteBulk (because destroyBulk exists always)
+// - Soft-delete extra abilities are injected only when soft-deletes is enabled
+// ============================================================================
+
 namespace App\Policies;
 
 use App\Models\User;
@@ -12,6 +19,11 @@ class {{MODEL_CLASS}}Policy
     public function create(User $user): bool { return true; }
     public function update(User $user, {{MODEL_CLASS}} $model): bool { return true; }
     public function delete(User $user, {{MODEL_CLASS}} $model): bool { return true; }
+
+    /**
+     * Custom ability for bulk delete endpoint (exists for ALL resources).
+     */
+    public function deleteBulk(User $user): bool { return true; }
 
 {{SOFT_POLICY_METHODS}}
 }

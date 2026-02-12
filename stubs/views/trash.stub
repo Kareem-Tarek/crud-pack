@@ -88,13 +88,17 @@
       </div>
 
       <div class="d-flex gap-2">
+        {{BLADE_CAN_RESTORE_BULK_BEGIN}}
         <button type="button" class="btn btn-outline-success" id="bulkRestoreBtn" disabled>
           Restore (Selected)
         </button>
+        {{BLADE_CAN_RESTORE_BULK_END}}
 
+        {{BLADE_CAN_FORCE_DELETE_BULK_BEGIN}}
         <button type="button" class="btn btn-outline-danger" id="bulkForceBtn" disabled>
           Permanently Delete (Selected)
         </button>
+        {{BLADE_CAN_FORCE_DELETE_BULK_END}}
       </div>
     </div>
   </div>
@@ -132,6 +136,7 @@
               <td>{{ $item->deleted_at?->timezone($tz)->format('d-m-Y | h:i A') ?? '' }}</td>
               <td class="text-end">
                 @if($softRoutesOk)
+                  {{BLADE_CAN_RESTORE_BEGIN}}
                   <form method="POST" action="{{ route('{{ROUTE_NAME}}.restore', $item->id) }}" class="d-inline">
                     @csrf
                     <button type="submit" title="Restore" class="btn btn-md btn-outline-success"
@@ -139,7 +144,9 @@
                       <i class='fa-solid fa-trash-arrow-up'></i>
                     </button>
                   </form>
+                  {{BLADE_CAN_RESTORE_END}}
 
+                  {{BLADE_CAN_FORCE_DELETE_BEGIN}}
                   <form method="POST" action="{{ route('{{ROUTE_NAME}}.forceDelete', $item->id) }}" class="d-inline">
                     @csrf
                     @method('DELETE')
@@ -148,6 +155,7 @@
                       <i class='fa-solid fa-skull-crossbones'></i>
                     </button>
                   </form>
+                  {{BLADE_CAN_FORCE_DELETE_END}}
                 @else
                   <span class="text-muted small">Soft routes disabled</span>
                 @endif
@@ -202,12 +210,14 @@
     const ids = selectedIds();
     const anyChecked = ids.length > 0;
 
-    restoreBtn.disabled = !anyChecked;
-    forceBtn.disabled = !anyChecked;
+    if (restoreBtn) restoreBtn.disabled = !anyChecked;
+    if (forceBtn) forceBtn.disabled = !anyChecked;
 
     const allChecked = checks.length > 0 && ids.length === checks.length;
-    selectAll.checked = allChecked;
-    selectAll.indeterminate = anyChecked && !allChecked;
+    if (selectAll) {
+      selectAll.checked = allChecked;
+      selectAll.indeterminate = anyChecked && !allChecked;
+    }
   }
 
   if (selectAll) {
@@ -242,13 +252,17 @@
     bulkForm.submit();
   }
 
-  restoreBtn.addEventListener('click', () =>
-    submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
-  );
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', () =>
+      submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
+    );
+  }
 
-  forceBtn.addEventListener('click', () =>
-    submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
-  );
+  if (forceBtn) {
+    forceBtn.addEventListener('click', () =>
+      submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
+    );
+  }
 
   syncState();
 })();

@@ -15,6 +15,7 @@
 
   <div class="card">
     <div class="card-body">
+      {{BLADE_CAN_UPDATE_BEGIN}}
       <form method="POST" action="{{ route('{{ROUTE_NAME}}.update', ${{MODEL_VAR}}) }}">
         @csrf
         @method('PUT')
@@ -26,6 +27,7 @@
           <a class="btn btn-light" href="{{ route('{{ROUTE_NAME}}.index') }}">Cancel</a>
         </div>
       </form>
+      {{BLADE_CAN_UPDATE_END}}
     </div>
   </div>
 </div>

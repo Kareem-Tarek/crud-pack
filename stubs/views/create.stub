@@ -13,6 +13,7 @@
 
   <div class="card">
     <div class="card-body">
+      {{BLADE_CAN_CREATE_BEGIN}}
       <form method="POST" action="{{ route('{{ROUTE_NAME}}.store') }}">
         @csrf
 
@@ -23,6 +24,7 @@
           <a class="btn btn-light" href="{{ route('{{ROUTE_NAME}}.index') }}">Cancel</a>
         </div>
       </form>
+      {{BLADE_CAN_CREATE_END}}
     </div>
   </div>
 </div>

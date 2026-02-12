@@ -2,8 +2,12 @@
 
 // ============================================================================
 // FILE: stubs/traits/HandlesDeletes.stub
-// UPDATED: Superset trait (always includes soft + non-soft), no placeholders.
-//          Soft methods are guarded + only reachable if routes are enabled.
+// UPDATED:
+// - Adds dynamic authorization helper: crudAuthorize() supporting none|authorize|gate|resource
+// - Exposes controller-callable methods WITHOUT "perform" prefix:
+//     destroyBulk, trash, restore, restoreBulk, forceDelete, forceDeleteBulk
+// - Keeps core logic in "perform*" methods as requested
+// - Soft-delete endpoints are guarded (safe response if SoftDeletes not supported)
 // ============================================================================
 
 namespace App\Http\Controllers\Concerns;
@@ -11,6 +15,7 @@ namespace App\Http\Controllers\Concerns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 
 trait HandlesDeletes
 {
@@ -23,6 +28,146 @@ trait HandlesDeletes
         $uses = class_uses_recursive($this->modelClass) ?: [];
         return in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, $uses, true);
     }
+
+    /**
+     * Dynamic authorization for both resource + custom methods.
+     *
+     * Controller sets:
+     *   protected string $policyStyle = 'none|authorize|gate|resource';
+     *
+     * Notes:
+     * - "resource" style auto-covers resource methods via authorizeResource(),
+     *   BUT custom methods still need explicit authorization => we handle here.
+     */
+    protected function crudAuthorize(string $ability, mixed $arguments = null): void
+    {
+        $style = property_exists($this, 'policyStyle')
+            ? strtolower(trim((string) $this->policyStyle))
+            : 'none';
+
+        if ($style === 'none') {
+            return;
+        }
+
+        $args = $arguments ?? $this->modelClass;
+
+        // "authorize" and "resource" both use authorize() when available
+        if ($style === 'authorize' || $style === 'resource') {
+            if (method_exists($this, 'authorize')) {
+                $this->authorize($ability, $args);
+                return;
+            }
+
+            Gate::authorize($ability, $args);
+            return;
+        }
+
+        if ($style === 'gate') {
+            Gate::authorize($ability, $args);
+            return;
+        }
+    }
+
+    /* ============================================================
+     | Controller-callable endpoints (NO "perform" prefix)
+     | - These are the methods your routes should point to.
+     | - They authorize dynamically, then delegate to perform* methods.
+     ============================================================ */
+
+    /**
+     * Bulk delete (exists ALWAYS: soft or no-soft).
+     * Route points to: destroyBulk
+     */
+    public function destroyBulk(Request $request)
+    {
+        $this->crudAuthorize('deleteBulk', $this->modelClass);
+
+        return $this->performDestroyBulk($request);
+    }
+
+    /**
+     * List soft-deleted records (soft deletes only).
+     * Route points to: trash
+     */
+    public function trash()
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $this->crudAuthorize('trash', $this->modelClass);
+
+        return $this->performTrash();
+    }
+
+    /**
+     * Restore single (soft deletes only).
+     * Route points to: restore
+     */
+    public function restore(int|string $id)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $model = $this->resolveTrashedModel($id);
+
+        $this->crudAuthorize('restore', $model);
+
+        return $this->performRestore($model);
+    }
+
+    /**
+     * Restore bulk (soft deletes only).
+     * Route points to: restoreBulk
+     */
+    public function restoreBulk(Request $request)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $this->crudAuthorize('restoreBulk', $this->modelClass);
+
+        return $this->performRestoreBulk($request);
+    }
+
+    /**
+     * Force delete single (soft deletes only).
+     * Route points to: forceDelete
+     */
+    public function forceDelete(int|string $id)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $model = $this->resolveTrashedModel($id);
+
+        $this->crudAuthorize('forceDelete', $model);
+
+        return $this->performForceDelete($model);
+    }
+
+    /**
+     * Force delete bulk (soft deletes only).
+     * Route points to: forceDeleteBulk
+     */
+    public function forceDeleteBulk(Request $request)
+    {
+        if (!$this->supportsSoftDeletes()) {
+            return $this->softNotSupportedResponse();
+        }
+
+        $this->crudAuthorize('forceDeleteBulk', $this->modelClass);
+
+        return $this->performForceDeleteBulk($request);
+    }
+
+    /* ============================================================
+     | Core actions (WITH "perform" prefix)
+     | - Controllers should call these for resource methods if needed.
+     ============================================================ */
 
     /**
      * Single delete (resource destroy).
@@ -42,7 +187,7 @@ trait HandlesDeletes
     }
 
     /**
-     * Bulk delete (explicit route: {uri}/bulk).
+     * Bulk delete logic (used by destroyBulk()).
      * Works whether soft deletes are on or off.
      */
     public function performDestroyBulk(Request $request)
@@ -58,22 +203,11 @@ trait HandlesDeletes
         return $this->deleteResponse('Selected records deleted.');
     }
 
-    /* ============================================================
-     | SOFT DELETE FEATURES
-     | Always present, but guarded.
-     | If the model doesn't use SoftDeletes => returns a safe response.
-     | NOTE: Whether these endpoints are reachable is controlled by routes.
-     ============================================================ */
-
     /**
-     * List soft-deleted records (explicit route) — soft deletes only.
+     * Trash listing logic (used by trash()).
      */
-    public function trash()
+    public function performTrash()
     {
-        if (!$this->supportsSoftDeletes()) {
-            return $this->softNotSupportedResponse();
-        }
-
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
         $items = $this->modelClass::onlyTrashed()->paginate(15);
 
@@ -102,15 +236,10 @@ trait HandlesDeletes
     }
 
     /**
-     * Restore single (explicit route) — soft deletes only.
+     * Restore single logic (used by restore()).
      */
-    public function restore(int|string $id)
+    public function performRestore(Model $model)
     {
-        if (!$this->supportsSoftDeletes()) {
-            return $this->softNotSupportedResponse();
-        }
-
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->restore();
 
         if (request()->expectsJson()) {
@@ -125,14 +254,10 @@ trait HandlesDeletes
     }
 
     /**
-     * Restore bulk (explicit route) — soft deletes only.
+     * Restore bulk logic (used by restoreBulk()).
      */
-    public function restoreBulk(Request $request)
+    public function performRestoreBulk(Request $request)
     {
-        if (!$this->supportsSoftDeletes()) {
-            return $this->softNotSupportedResponse();
-        }
-
         $ids = $this->extractIds($request);
 
         if (empty($ids)) {
@@ -160,15 +285,10 @@ trait HandlesDeletes
     }
 
     /**
-     * Force delete single (explicit route) — soft deletes only.
+     * Force delete single logic (used by forceDelete()).
      */
-    public function forceDelete(int|string $id)
+    public function performForceDelete(Model $model)
     {
-        if (!$this->supportsSoftDeletes()) {
-            return $this->softNotSupportedResponse();
-        }
-
-        $model = $this->modelClass::onlyTrashed()->findOrFail($id);
         $model->forceDelete();
 
         if (request()->expectsJson()) {
@@ -182,14 +302,10 @@ trait HandlesDeletes
     }
 
     /**
-     * Force delete bulk (explicit route) — soft deletes only.
+     * Force delete bulk logic (used by forceDeleteBulk()).
      */
-    public function forceDeleteBulk(Request $request)
+    public function performForceDeleteBulk(Request $request)
     {
-        if (!$this->supportsSoftDeletes()) {
-            return $this->softNotSupportedResponse();
-        }
-
         $ids = $this->extractIds($request);
 
         if (empty($ids)) {
@@ -223,7 +339,7 @@ trait HandlesDeletes
     protected function softNotSupportedResponse()
     {
         if (request()->expectsJson()) {
-            return response()->json([
+            return response ()->json([
                 'success' => false,
                 'message' => 'Soft deletes are not enabled for this resource.',
             ], 404);
@@ -251,6 +367,11 @@ trait HandlesDeletes
         }
 
         return $this->modelClass::query()->findOrFail($modelOrId);
+    }
+
+    protected function resolveTrashedModel(int|string $id): Model
+    {
+        return $this->modelClass::onlyTrashed()->findOrFail($id);
     }
 
     protected function deleteResponse(string $message)

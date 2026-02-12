@@ -76,10 +76,13 @@
   </div>
 
   <div class="mt-3 d-flex gap-2">
+    {{BLADE_CAN_UPDATE_BEGIN}}
     <a class="btn btn-lg btn-outline-primary" title="Edit" href="{{ route('{{ROUTE_NAME}}.edit', ${{MODEL_VAR}}) }}">
       <i class='fa-solid fa-pen-to-square'></i>
     </a>
+    {{BLADE_CAN_UPDATE_END}}
 
+    {{BLADE_CAN_DELETE_BEGIN}}
     <form method="POST" action="{{ route('{{ROUTE_NAME}}.destroy', ${{MODEL_VAR}}) }}">
       @csrf
       @method('DELETE')
@@ -89,6 +92,7 @@
         {!! $deleteIcon !!}
       </button>
     </form>
+    {{BLADE_CAN_DELETE_END}}
   </div>
 </div>
 @endsection

@@ -1,5 +1,14 @@
 <?php
 
+// ============================================================================
+// FILE: stubs/controllers/api.controller.stub
+// UPDATED:
+// - Adds $policyStyle property (used by HandlesDeletes::crudAuthorize())
+// - Keeps resource methods as-is (authorization via placeholders / authorizeResource)
+// - Bulk + soft-delete custom endpoints are provided by HandlesDeletes trait:
+//   destroyBulk, trash, restore, restoreBulk, forceDelete, forceDeleteBulk
+// ============================================================================
+
 namespace App\Http\Controllers\Api;
 
 {{REQUEST_IMPORT}}
@@ -15,6 +24,12 @@ class {{MODEL_CLASS}}Controller extends Controller
     {{CLASS_TRAITS}}
 
     protected string $modelClass = {{MODEL_CLASS}}::class;
+
+    /**
+     * Policy authorization style: none|authorize|gate|resource
+     * Used by HandlesDeletes::crudAuthorize() for custom endpoints.
+     */
+    protected string $policyStyle = '{{POLICY_STYLE}}';
 
 {{CONSTRUCTOR}}
     public function index()

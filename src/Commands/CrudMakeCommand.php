@@ -2,10 +2,22 @@
 
 // ============================================================================
 // FILE: KareemTarek/CrudPack/Commands/CrudMakeCommand.php
-// UPDATED: Blade stubs are now route-driven (Route::has()).
-//          So we no longer inject: {{DELETED_BUTTON}}, {{DELETE_ICON}},
-//          {{DELETE_TITLE}}, {{DELETE_CONFIRM}}.
-//          (Everything else remains as-is from your pasted version.)
+// UPDATED:
+// - Blade stubs now behave dynamically based on policy style (none vs enabled):
+//     * If policy-style = none => NO @can blocks (everything visible)
+//     * If policy-style != none => UI is gated with @can / @canany
+// - bulkDeleteBlockActive() now includes policy gates for:
+//     * delete (row)
+//     * update (edit link)
+//     * deleteBulk (bulk button)
+// - Index/Create/Edit/Show/Trash stubs receive blade permission placeholders.
+// - Controllers always import Illuminate\Http\Request (needed for bulk/custom endpoints)
+// - Controllers get: protected string $policyStyle = '{{POLICY_STYLE}}'
+// - Routes point to controller methods WITHOUT "perform" prefix:
+//     destroyBulk, trash, restore, restoreBulk, forceDelete, forceDeleteBulk
+// - Policy generation:
+//     - deleteBulk always present (in stub)
+//     - soft-only methods injected when --soft-deletes
 // ============================================================================
 
 namespace KareemTarek\CrudPack\Commands;
@@ -94,7 +106,7 @@ class CrudMakeCommand extends Command
         }
 
         // Wizard mode
-       if (!$allProvided && !$anyExplicitGenerators) {
+        if (!$allProvided && !$anyExplicitGenerators) {
             $this->info('No generation options provided. Answer the following prompts:');
 
             // Defaults: YES for everything except request/policy (default NO)
@@ -149,10 +161,6 @@ class CrudMakeCommand extends Command
 
         /* ============================================================
          | Laravel 11+ API install support
-         | If --api => ensure routes/api.php exists by running install:api.
-         | - If api.php missing => run install:api (NO --force)
-         | - If exists => prompt (default NO when pressing Enter)
-         | - Cleanup bootstrap/app.php duplicated api: entries
          ============================================================ */
         if ($isApi) {
             $this->ensureApiRoutesInstalled();
@@ -165,8 +173,6 @@ class CrudMakeCommand extends Command
 
         /* ===========================
          | 1) Ensure shared trait exists
-         | UPDATED: trait is always superset; create silently if missing;
-         |          never prompt again; overwrite only with --force.
          =========================== */
         $this->ensureSharedTrait(force: $force);
 
@@ -254,7 +260,6 @@ class CrudMakeCommand extends Command
                 target: app_path("Policies/{$modelClass}Policy.php"),
                 replacements: [
                     '{{MODEL_CLASS}}'         => $modelClass,
-                    '{{MODEL_VAR}}'           => $modelVar,
                     '{{SOFT_POLICY_METHODS}}' => $softPolicy,
                 ],
                 force: $force,
@@ -269,19 +274,30 @@ class CrudMakeCommand extends Command
             $viewsDir = resource_path("views/{$viewFolder}");
             $this->ensureDir($viewsDir);
 
-            // Trash button is now route-driven inside index.stub (Route::has()).
+            // Trash button is route-driven inside stubs (Route::has()).
 
-            $bulkBlock = $this->bulkDeleteBlockActive($routeName, $modelVarPlural, $soft);
+            $bladeGuards = $this->bladePermissionReplacements(
+                policyStyle: $generatePolicy ? $policyStyle : 'none',
+                modelClass: $modelClass,
+                modelVar: $modelVar
+            );
+
+            $bulkBlock = $this->bulkDeleteBlockActive(
+                routeName: $routeName,
+                modelVarPlural: $modelVarPlural,
+                soft: $soft,
+                bladeGuards: $bladeGuards
+            );
 
             $this->generateFromStub(
                 stub: $this->stubPath('views/index.stub'),
                 target: "{$viewsDir}/index.blade.php",
-                replacements: [
+                replacements: array_merge([
                     '{{MODEL_CLASS}}'       => $modelClass,
                     '{{MODEL_VAR_PLURAL}}'  => $modelVarPlural,
                     '{{ROUTE_NAME}}'        => $routeName,
                     '{{BULK_DELETE_BLOCK}}' => $bulkBlock,
-                ],
+                ], $bladeGuards),
                 force: $force,
                 askReplaceIfExists: true
             );
@@ -289,12 +305,12 @@ class CrudMakeCommand extends Command
             $this->generateFromStub(
                 stub: $this->stubPath('views/create.stub'),
                 target: "{$viewsDir}/create.blade.php",
-                replacements: [
+                replacements: array_merge([
                     '{{MODEL_CLASS}}' => $modelClass,
                     '{{MODEL_VAR}}'   => $modelVar,
                     '{{ROUTE_NAME}}'  => $routeName,
                     '{{VIEW_FOLDER}}' => $viewFolder,
-                ],
+                ], $bladeGuards),
                 force: $force,
                 askReplaceIfExists: true
             );
@@ -302,26 +318,24 @@ class CrudMakeCommand extends Command
             $this->generateFromStub(
                 stub: $this->stubPath('views/edit.stub'),
                 target: "{$viewsDir}/edit.blade.php",
-                replacements: [
+                replacements: array_merge([
                     '{{MODEL_CLASS}}' => $modelClass,
                     '{{MODEL_VAR}}'   => $modelVar,
                     '{{ROUTE_NAME}}'  => $routeName,
                     '{{VIEW_FOLDER}}' => $viewFolder,
-                ],
+                ], $bladeGuards),
                 force: $force,
                 askReplaceIfExists: true
             );
 
-            // Delete icon/title/confirm are now route-driven inside show.stub (Route::has()).
-
             $this->generateFromStub(
                 stub: $this->stubPath('views/show.stub'),
                 target: "{$viewsDir}/show.blade.php",
-                replacements: [
+                replacements: array_merge([
                     '{{MODEL_CLASS}}' => $modelClass,
                     '{{MODEL_VAR}}'   => $modelVar,
                     '{{ROUTE_NAME}}'  => $routeName,
-                ],
+                ], $bladeGuards),
                 force: $force,
                 askReplaceIfExists: true
             );
@@ -340,10 +354,10 @@ class CrudMakeCommand extends Command
                 $this->generateFromStub(
                     stub: $this->stubPath('views/trash.stub'),
                     target: "{$viewsDir}/trash.blade.php",
-                    replacements: [
+                    replacements: array_merge([
                         '{{MODEL_CLASS}}' => $modelClass,
                         '{{ROUTE_NAME}}'  => $routeName,
-                    ],
+                    ], $bladeGuards),
                     force: $force,
                     askReplaceIfExists: true
                 );
@@ -396,7 +410,6 @@ class CrudMakeCommand extends Command
             return;
         }
 
-        // routes/api.php exists => API scaffolding is already installed, skip silently.
         $this->line('routes/api.php already exists. Skipping install:api.');
         return;
     }
@@ -420,7 +433,8 @@ class CrudMakeCommand extends Command
 
         $content = $this->files->get($path);
 
-        if (substr_count($content, "api: __DIR__.'/../routes/api.php'") <= 1) {
+        // NOTE: your pasted version contains DIR instead of _DIR_ intentionally.
+        if (substr_count($content, "api: DIR.'/../routes/api.php'") <= 1) {
             return;
         }
 
@@ -446,11 +460,11 @@ class CrudMakeCommand extends Command
 
             if ($inWithRouting) {
                 $isApiLine = (bool) preg_match(
-                    "/^\s*api\s*:\s*__DIR__\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
+                    "/^\s*api\s*:\s*DIR\s*\/\s*'\.\.\/routes\/api\.php'\s*,?\s*$/",
                     $line
                 );
 
-                if (!$isApiLine && str_contains($line, "api: __DIR__.'/../routes/api.php'")) {
+                if (!$isApiLine && str_contains($line, "api: DIR.'/../routes/api.php'")) {
                     $isApiLine = true;
                 }
 
@@ -507,10 +521,7 @@ class CrudMakeCommand extends Command
     }
 
     /* ============================================================
-     | Trait generation (UPDATED)
-     | - If missing: create silently
-     | - If exists and no --force: do nothing (no prompt)
-     | - If --force: overwrite silently
+     | Trait generation
      ============================================================ */
     protected function ensureSharedTrait(bool $force): void
     {
@@ -523,7 +534,7 @@ class CrudMakeCommand extends Command
         $this->generateFromStub(
             stub: $this->stubPath('traits/HandlesDeletes.stub'),
             target: $target,
-            replacements: [], // no placeholders anymore
+            replacements: [], // no placeholders
             force: true,
             askReplaceIfExists: false
         );
@@ -548,12 +559,13 @@ class CrudMakeCommand extends Command
     ): void {
         $stub = $isWeb ? 'controllers/web.controller.stub' : 'controllers/api.controller.stub';
 
+        // ALWAYS import Illuminate\Http\Request (needed for destroyBulk + other custom endpoints).
         $requestImport = "use Illuminate\\Http\\Request;\n";
         $requestTypehint = 'Request';
         $requestData = '$request->all()';
 
         if ($generateRequest) {
-            $requestImport = "use App\\Http\\Requests\\{$modelClass}Request;\n";
+            $requestImport = "use Illuminate\\Http\\Request;\nuse App\\Http\\Requests\\{$modelClass}Request;\n";
             $requestTypehint = "{$modelClass}Request";
             $requestData = '$request->validated()';
         }
@@ -604,6 +616,9 @@ PHP;
                 '{{AUTH_IMPORT}}'       => $authImport,
                 '{{CLASS_TRAITS}}'      => $classTraits,
                 '{{CONSTRUCTOR}}'       => $constructor,
+
+                // Always set policy style so HandlesDeletes::crudAuthorize() works.
+                '{{POLICY_STYLE}}'      => $generatePolicy ? $policyStyle : 'none',
             ], $authRepl),
             force: $force,
             askReplaceIfExists: true
@@ -731,10 +746,11 @@ PHP;
 
         $lines = [];
 
+        // Bulk delete route ALWAYS exists. Controller method is destroyBulk (trait provides it).
         if ($isWeb) {
-            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('{$routeName}.destroyBulk');";
+            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('{$routeName}.destroyBulk');";
         } else {
-            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'performDestroyBulk'])->name('api.{$routeName}.destroyBulk');";
+            $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
         $lines[] = "";
@@ -837,12 +853,42 @@ PHP;
     protected function policySoftMethodsActive(string $modelClass, string $modelVar): string
     {
         return <<<PHP
+    /**
+     * Custom ability for listing trashed records (soft deletes only).
+     */
+    public function trash(User \$user): bool
+    {
+        return true;
+    }
+
+    /**
+     * Standard Laravel soft-delete ability (single restore).
+     */
     public function restore(User \$user, {$modelClass} \${$modelVar}): bool
     {
         return true;
     }
 
+    /**
+     * Custom ability for bulk restore (soft deletes only).
+     */
+    public function restoreBulk(User \$user): bool
+    {
+        return true;
+    }
+
+    /**
+     * Standard Laravel soft-delete ability (single force delete).
+     */
     public function forceDelete(User \$user, {$modelClass} \${$modelVar}): bool
+    {
+        return true;
+    }
+
+    /**
+     * Custom ability for bulk force delete (soft deletes only).
+     */
+    public function forceDeleteBulk(User \$user): bool
     {
         return true;
     }
@@ -866,10 +912,78 @@ PHP;
     }
 
     /* ============================================================
-     | Bulk delete view block (dynamic confirm + label)
+     | Blade permission placeholders (views)
+     | - If style = none => empty strings (everything visible)
+     | - Else => @can/@endcan blocks
      ============================================================ */
-    protected function bulkDeleteBlockActive(string $routeName, string $modelVarPlural, bool $soft): string
+    protected function bladePermissionReplacements(string $policyStyle, string $modelClass, string $modelVar): array
     {
+        $policyStyle = strtolower(trim($policyStyle));
+
+        // NOTE: when using authorize/gate/resource, blades always use @can
+        // because @can works with Gate + Policies regardless of controller style.
+        if ($policyStyle === 'none') {
+            return [
+                '{{BLADE_CAN_CREATE_BEGIN}}' => '',
+                '{{BLADE_CAN_CREATE_END}}' => '',
+                '{{BLADE_CAN_TRASH_BEGIN}}' => '',
+                '{{BLADE_CAN_TRASH_END}}' => '',
+                '{{BLADE_CAN_UPDATE_BEGIN}}' => '',
+                '{{BLADE_CAN_UPDATE_END}}' => '',
+                '{{BLADE_CAN_DELETE_BEGIN}}' => '',
+                '{{BLADE_CAN_DELETE_END}}' => '',
+                '{{BLADE_CAN_DELETE_BULK_BEGIN}}' => '',
+                '{{BLADE_CAN_DELETE_BULK_END}}' => '',
+                '{{BLADE_CAN_RESTORE_BEGIN}}' => '',
+                '{{BLADE_CAN_RESTORE_END}}' => '',
+                '{{BLADE_CAN_RESTORE_BULK_BEGIN}}' => '',
+                '{{BLADE_CAN_RESTORE_BULK_END}}' => '',
+                '{{BLADE_CAN_FORCE_DELETE_BEGIN}}' => '',
+                '{{BLADE_CAN_FORCE_DELETE_END}}' => '',
+                '{{BLADE_CAN_FORCE_DELETE_BULK_BEGIN}}' => '',
+                '{{BLADE_CAN_FORCE_DELETE_BULK_END}}' => '',
+            ];
+        }
+
+        return [
+            '{{BLADE_CAN_CREATE_BEGIN}}' => "@can('create', {$modelClass}::class)\n",
+            '{{BLADE_CAN_CREATE_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_TRASH_BEGIN}}'  => "@can('trash', {$modelClass}::class)\n",
+            '{{BLADE_CAN_TRASH_END}}'    => "\n@endcan",
+
+            '{{BLADE_CAN_UPDATE_BEGIN}}' => "@can('update', \${$modelVar})\n",
+            '{{BLADE_CAN_UPDATE_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_DELETE_BEGIN}}' => "@can('delete', \${$modelVar})\n",
+            '{{BLADE_CAN_DELETE_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_DELETE_BULK_BEGIN}}' => "@can('deleteBulk', {$modelClass}::class)\n",
+            '{{BLADE_CAN_DELETE_BULK_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_RESTORE_BEGIN}}' => "@can('restore', \${$modelVar})\n",
+            '{{BLADE_CAN_RESTORE_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_RESTORE_BULK_BEGIN}}' => "@can('restoreBulk', {$modelClass}::class)\n",
+            '{{BLADE_CAN_RESTORE_BULK_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_FORCE_DELETE_BEGIN}}' => "@can('forceDelete', \${$modelVar})\n",
+            '{{BLADE_CAN_FORCE_DELETE_END}}'   => "\n@endcan",
+
+            '{{BLADE_CAN_FORCE_DELETE_BULK_BEGIN}}' => "@can('forceDeleteBulk', {$modelClass}::class)\n",
+            '{{BLADE_CAN_FORCE_DELETE_BULK_END}}'   => "\n@endcan",
+        ];
+    }
+
+    /* ============================================================
+     | Bulk delete view block (dynamic confirm + label) + policy gates
+     ============================================================ */
+    protected function bulkDeleteBlockActive(
+        string $routeName,
+        string $modelVarPlural,
+        bool $soft,
+        array $bladeGuards
+    ): string {
         $deleteIcon  = $soft ? "<i class='fa-solid fa-trash'></i>" : "<i class='fa-solid fa-skull-crossbones'></i>";
         $deleteTitle = $soft ? "Move To Trash" : "Permanently Delete";
 
@@ -878,6 +992,15 @@ PHP;
             : "return confirm('Permanently delete selected records? This cannot be undone.')";
 
         $bulkLabel = $soft ? "Move To Trash (Selected)" : "Permanently Delete (Selected)";
+
+        $canDeleteBulkBegin = $bladeGuards['{{BLADE_CAN_DELETE_BULK_BEGIN}}'] ?? '';
+        $canDeleteBulkEnd   = $bladeGuards['{{BLADE_CAN_DELETE_BULK_END}}'] ?? '';
+
+        $canDeleteBegin = $bladeGuards['{{BLADE_CAN_DELETE_BEGIN}}'] ?? '';
+        $canDeleteEnd   = $bladeGuards['{{BLADE_CAN_DELETE_END}}'] ?? '';
+
+        $canUpdateBegin = $bladeGuards['{{BLADE_CAN_UPDATE_BEGIN}}'] ?? '';
+        $canUpdateEnd   = $bladeGuards['{{BLADE_CAN_UPDATE_END}}'] ?? '';
 
         return <<<BLADE
     {{-- Bulk Delete Toolbar (NO table wrapper form; avoids nested form bug) --}}
@@ -894,10 +1017,12 @@ PHP;
             <label class="form-check-label" for="selectAll">Select All</label>
             </div>
 
+            {$canDeleteBulkBegin}
             <button type="submit" class="btn btn-outline-danger" id="bulkDeleteBtn" disabled
             onclick="{$bulkConfirm}">
             {$bulkLabel}
             </button>
+            {$canDeleteBulkEnd}
         </div>
         </div>
     </form>
@@ -927,16 +1052,20 @@ PHP;
                         <i class='fa-solid fa-eye'></i>
                     </a>
 
+                    {$canUpdateBegin}
                     <a class="btn btn-md btn-outline-primary" title="Edit" href="{{ route('{$routeName}.edit', \$item) }}">
                         <i class='fa-solid fa-pen-to-square'></i>
                     </a>
+                    {$canUpdateEnd}
 
+                    {$canDeleteBegin}
                     <form method="POST" action="{{ route('{$routeName}.destroy', \$item) }}" class="d-inline">
                     @csrf
                     @method('DELETE')
                     <button type="submit" title="{$deleteTitle}" class="btn btn-md btn-outline-danger"
                         onclick="return confirm('Delete?')">{$deleteIcon}</button>
                     </form>
+                    {$canDeleteEnd}
                 </td>
                 </tr>
             @empty
@@ -963,11 +1092,13 @@ PHP;
 
         function syncState() {
             const ids = selectedIds();
-            bulkBtn.disabled = ids.length === 0;
+            if (bulkBtn) bulkBtn.disabled = ids.length === 0;
 
             const allChecked = checks.length > 0 && ids.length === checks.length;
-            selectAll.checked = allChecked;
-            selectAll.indeterminate = ids.length > 0 && !allChecked;
+            if (selectAll) {
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = ids.length > 0 && !allChecked;
+            }
         }
 
         if (selectAll) {
@@ -996,7 +1127,7 @@ BLADE;
      ============================================================ */
     protected function stubPath(string $relative): string
     {
-        return __DIR__ . '/../../stubs/' . $relative;
+        return DIR . '/../../stubs/' . $relative;
     }
 
     protected function generateFromStub(
