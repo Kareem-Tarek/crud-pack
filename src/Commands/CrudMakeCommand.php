@@ -677,7 +677,7 @@ PHP;
         $migrationsDir = database_path('migrations');
 
         // Laravel convention: *create<table>_table.php
-        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*create{$table}_table.php";
+        $pattern = $migrationsDir . DIRECTORY_SEPARATOR . "*_create_{$table}_table.php";
         $existing = glob($pattern) ?: [];
 
         $softColumn = $soft
