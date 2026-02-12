@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 --- -->
 
+![Laravel CrudPack ToolKit logo](logo.png)
+
 ## [0.1.0] - Initial Release
 
 ### Added
