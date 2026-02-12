@@ -60,6 +60,22 @@
     </a>
   </div>
 
+  {{-- Search --}}
+  <div class="mb-3">
+    <input
+      type="text"
+      class="form-control"
+      id="crudTrashSearch"
+      placeholder="Search trashed by ID or Name..."
+      value="{{ request('q') }}"
+      autocomplete="off"
+      {{ $softRoutesOk ? '' : 'disabled' }}
+    >
+    <div class="form-text text-muted">
+      Searches across all trashed pages (server-side).
+    </div>
+  </div>
+
   @if(!$softRoutesOk)
     <div class="alert alert-warning">
       Soft-delete routes are not enabled for this resource. Generate routes with <code>--soft-deletes</code>.
@@ -75,9 +91,21 @@
               class="close-x"
               aria-label="Close"
               data-bs-dismiss="alert">×</button>
-      {{-- BS4: change data-bs-dismiss to data-dismiss --}}
     </div>
   @endif
+
+  {{-- AJAX target --}}
+  <div id="trashResults">
+    @yield('crud_results')
+  </div>
+</div>
+@endsection
+
+@section('crud_results')
+  {{-- Optional: filtered count --}}
+  <div class="text-muted small mb-2">
+    Results: {{ $filteredTotal ?? ($items->total() ?? 0) }}
+  </div>
 
   {{-- Bulk Actions Toolbar (NOT wrapping table) --}}
   <div class="card mb-3">
@@ -182,7 +210,6 @@
   <div class="mt-3">
     {{ $items->links('vendor.pagination.bootstrap-5') }}
   </div>
-</div>
 @endsection
 
 @push('scripts')
@@ -191,80 +218,154 @@
   const softRoutesOk = {{ $softRoutesOk ? 'true' : 'false' }};
   if (!softRoutesOk) return;
 
-  const restoreBulkUrl = @json($restoreBulkUrl);
-  const forceBulkUrl   = @json($forceBulkUrl);
+  const input = document.getElementById('crudTrashSearch');
+  const results = document.getElementById('trashResults');
 
-  const selectAll = document.getElementById('selectAllTrashed');
-  const checks = Array.from(document.querySelectorAll('.row-check-trashed'));
-  const restoreBtn = document.getElementById('bulkRestoreBtn');
-  const forceBtn = document.getElementById('bulkForceBtn');
-
-  const bulkForm = document.getElementById('bulkTrashedForm');
-  const idsInput = document.getElementById('trashedIds');
-
-  function selectedIds() {
-    return checks.filter(c => c.checked).map(c => c.value);
+  function withAjaxHeader() {
+    return {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'text/html'
+    };
   }
 
-  function syncState() {
-    const ids = selectedIds();
-    const anyChecked = ids.length > 0;
+  function initTrashBulkUI() {
+    const selectAll = document.getElementById('selectAllTrashed');
+    const checks = Array.from(document.querySelectorAll('.row-check-trashed'));
+    const restoreBtn = document.getElementById('bulkRestoreBtn');
+    const forceBtn = document.getElementById('bulkForceBtn');
 
-    if (restoreBtn) restoreBtn.disabled = !anyChecked;
-    if (forceBtn) forceBtn.disabled = !anyChecked;
+    const bulkForm = document.getElementById('bulkTrashedForm');
+    const idsInput = document.getElementById('trashedIds');
 
-    const allChecked = checks.length > 0 && ids.length === checks.length;
+    const restoreBulkUrl = @json($restoreBulkUrl);
+    const forceBulkUrl   = @json($forceBulkUrl);
+
+    function selectedIds() {
+      return checks.filter(c => c.checked).map(c => c.value);
+    }
+
+    function syncState() {
+      const ids = selectedIds();
+      const anyChecked = ids.length > 0;
+
+      if (restoreBtn) restoreBtn.disabled = !anyChecked;
+      if (forceBtn) forceBtn.disabled = !anyChecked;
+
+      const allChecked = checks.length > 0 && ids.length === checks.length;
+      if (selectAll) {
+        selectAll.checked = allChecked;
+        selectAll.indeterminate = anyChecked && !allChecked;
+      }
+    }
+
     if (selectAll) {
-      selectAll.checked = allChecked;
-      selectAll.indeterminate = anyChecked && !allChecked;
+      selectAll.addEventListener('change', function () {
+        checks.forEach(c => c.checked = selectAll.checked);
+        syncState();
+      });
     }
+
+    checks.forEach(c => c.addEventListener('change', syncState));
+
+    function submitBulk(url, method, confirmMsg) {
+      const ids = selectedIds();
+      if (ids.length === 0) return;
+
+      if (!confirm(confirmMsg)) return;
+
+      idsInput.value = ids.join(',');
+      bulkForm.action = url;
+
+      const existing = bulkForm.querySelector('input[name="_method"]');
+      if (existing) existing.remove();
+
+      if (method !== 'POST') {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_method';
+        input.value = method;
+        bulkForm.appendChild(input);
+      }
+
+      bulkForm.submit();
+    }
+
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', () =>
+        submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
+      );
+    }
+
+    if (forceBtn) {
+      forceBtn.addEventListener('click', () =>
+        submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
+      );
+    }
+
+    syncState();
   }
 
-  if (selectAll) {
-    selectAll.addEventListener('change', function () {
-      checks.forEach(c => c.checked = selectAll.checked);
-      syncState();
+  // First init
+  initTrashBulkUI();
+
+  // AJAX search + pagination
+  if (!input || !results) return;
+
+  let timer = null;
+  let controller = null;
+
+  function setQueryInUrl(q) {
+    const url = new URL(window.location.href);
+    if (q && q.trim() !== '') url.searchParams.set('q', q.trim());
+    else url.searchParams.delete('q');
+    url.searchParams.delete('page');
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  function buildUrl(pageUrl) {
+    const url = new URL(pageUrl || window.location.href);
+    const q = input.value.trim();
+    if (q) url.searchParams.set('q', q);
+    else url.searchParams.delete('q');
+    return url.toString();
+  }
+
+  async function load(url) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    const res = await fetch(url, {
+      headers: withAjaxHeader(),
+      signal: controller.signal
     });
+
+    if (!res.ok) return;
+
+    const html = await res.text();
+    results.innerHTML = html;
+
+    // re-init bulk UI listeners after HTML replacement
+    initTrashBulkUI();
   }
 
-  checks.forEach(c => c.addEventListener('change', syncState));
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const q = input.value;
+      setQueryInUrl(q);
+      load(buildUrl(window.location.href));
+    }, 250);
+  });
 
-  function submitBulk(url, method, confirmMsg) {
-    const ids = selectedIds();
-    if (ids.length === 0) return;
+  results.addEventListener('click', function (e) {
+    const a = e.target.closest('a');
+    if (!a) return;
+    if (!a.closest('.pagination')) return;
 
-    if (!confirm(confirmMsg)) return;
-
-    idsInput.value = ids.join(',');
-    bulkForm.action = url;
-
-    const existing = bulkForm.querySelector('input[name="_method"]');
-    if (existing) existing.remove();
-
-    if (method !== 'POST') {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = '_method';
-      input.value = method;
-      bulkForm.appendChild(input);
-    }
-
-    bulkForm.submit();
-  }
-
-  if (restoreBtn) {
-    restoreBtn.addEventListener('click', () =>
-      submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
-    );
-  }
-
-  if (forceBtn) {
-    forceBtn.addEventListener('click', () =>
-      submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
-    );
-  }
-
-  syncState();
+    e.preventDefault();
+    load(buildUrl(a.href));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 })();
 </script>
 @endpush

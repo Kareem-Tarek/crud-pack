@@ -3,11 +3,8 @@
 // ============================================================================
 // FILE: stubs/traits/HandlesDeletes.stub
 // UPDATED:
-// - Adds dynamic authorization helper: crudAuthorize() supporting none|authorize|gate|resource
-// - Exposes controller-callable methods WITHOUT "perform" prefix:
-//     destroyBulk, trash, restore, restoreBulk, forceDelete, forceDeleteBulk
-// - Keeps core logic in "perform*" methods as requested
-// - Soft-delete endpoints are guarded (safe response if SoftDeletes not supported)
+// - Trash (web) supports server-side search (q) + pagination appends
+// - Trash (web) supports AJAX: returns only "crud_results" section HTML
 // ============================================================================
 
 namespace App\Http\Controllers\Concerns;
@@ -16,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
 trait HandlesDeletes
 {
@@ -30,14 +28,36 @@ trait HandlesDeletes
     }
 
     /**
+     * Generic, safe search:
+     * - If table has "name" column => search by name LIKE
+     * - Always allow exact ID match when numeric
+     */
+    protected function crudApplySearch($query, ?string $q)
+    {
+        $q = trim((string) $q);
+        if ($q === '') return $query;
+
+        $model = $query->getModel();
+        $table = $model->getTable();
+
+        $hasName = Schema::hasColumn($table, 'name');
+
+        return $query->where(function ($w) use ($q, $hasName) {
+            if (is_numeric($q)) {
+                $w->orWhereKey((int) $q);
+            }
+
+            if ($hasName) {
+                $w->orWhere('name', 'like', "%{$q}%");
+            }
+        });
+    }
+
+    /**
      * Dynamic authorization for both resource + custom methods.
      *
      * Controller sets:
      *   protected string $policyStyle = 'none|authorize|gate|resource';
-     *
-     * Notes:
-     * - "resource" style auto-covers resource methods via authorizeResource(),
-     *   BUT custom methods still need explicit authorization => we handle here.
      */
     protected function crudAuthorize(string $ability, mixed $arguments = null): void
     {
@@ -51,7 +71,6 @@ trait HandlesDeletes
 
         $args = $arguments ?? $this->modelClass;
 
-        // "authorize" and "resource" both use authorize() when available
         if ($style === 'authorize' || $style === 'resource') {
             if (method_exists($this, 'authorize')) {
                 $this->authorize($ability, $args);
@@ -70,25 +89,14 @@ trait HandlesDeletes
 
     /* ============================================================
      | Controller-callable endpoints (NO "perform" prefix)
-     | - These are the methods your routes should point to.
-     | - They authorize dynamically, then delegate to perform* methods.
      ============================================================ */
 
-    /**
-     * Bulk delete (exists ALWAYS: soft or no-soft).
-     * Route points to: destroyBulk
-     */
     public function destroyBulk(Request $request)
     {
         $this->crudAuthorize('deleteBulk', $this->modelClass);
-
         return $this->performDestroyBulk($request);
     }
 
-    /**
-     * List soft-deleted records (soft deletes only).
-     * Route points to: trash
-     */
     public function trash()
     {
         if (!$this->supportsSoftDeletes()) {
@@ -100,10 +108,6 @@ trait HandlesDeletes
         return $this->performTrash();
     }
 
-    /**
-     * Restore single (soft deletes only).
-     * Route points to: restore
-     */
     public function restore(int|string $id)
     {
         if (!$this->supportsSoftDeletes()) {
@@ -117,10 +121,6 @@ trait HandlesDeletes
         return $this->performRestore($model);
     }
 
-    /**
-     * Restore bulk (soft deletes only).
-     * Route points to: restoreBulk
-     */
     public function restoreBulk(Request $request)
     {
         if (!$this->supportsSoftDeletes()) {
@@ -132,10 +132,6 @@ trait HandlesDeletes
         return $this->performRestoreBulk($request);
     }
 
-    /**
-     * Force delete single (soft deletes only).
-     * Route points to: forceDelete
-     */
     public function forceDelete(int|string $id)
     {
         if (!$this->supportsSoftDeletes()) {
@@ -149,10 +145,6 @@ trait HandlesDeletes
         return $this->performForceDelete($model);
     }
 
-    /**
-     * Force delete bulk (soft deletes only).
-     * Route points to: forceDeleteBulk
-     */
     public function forceDeleteBulk(Request $request)
     {
         if (!$this->supportsSoftDeletes()) {
@@ -166,17 +158,8 @@ trait HandlesDeletes
 
     /* ============================================================
      | Core actions (WITH "perform" prefix)
-     | - Controllers should call these for resource methods if needed.
      ============================================================ */
 
-    /**
-     * Single delete (resource destroy).
-     * Works with Route::resource / Route::apiResource.
-     *
-     * IMPORTANT:
-     * - Resource destroy receives {product} model binding if controller destroy(Product $product)
-     * - If it receives id, we resolve via $this->modelClass.
-     */
     public function performDestroy($modelOrId)
     {
         $model = $this->resolveModel($modelOrId);
@@ -186,10 +169,6 @@ trait HandlesDeletes
         return $this->deleteResponse('Deleted successfully.');
     }
 
-    /**
-     * Bulk delete logic (used by destroyBulk()).
-     * Works whether soft deletes are on or off.
-     */
     public function performDestroyBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -205,17 +184,30 @@ trait HandlesDeletes
 
     /**
      * Trash listing logic (used by trash()).
+     * - Supports server-side search (q)
+     * - Supports AJAX: returns only "crud_results" HTML for web
      */
     public function performTrash()
     {
         $trashedTotal = $this->modelClass::onlyTrashed()->count();
-        $items = $this->modelClass::onlyTrashed()->paginate(15);
+
+        $q = request('q');
+
+        $query = $this->modelClass::onlyTrashed();
+        $query = $this->crudApplySearch($query, $q);
+
+        $items = $query->paginate(15)->appends([
+            'q' => $q,
+        ]);
+
+        $filteredTotal = $items->total();
 
         if (request()->expectsJson()) {
             return response()->json([
                 'success'      => true,
                 'message'      => 'OK',
                 'trashedTotal' => $trashedTotal,
+                'filteredTotal'=> $filteredTotal,
                 'data'         => $items->items(),
                 'meta'         => [
                     'current_page' => $items->currentPage(),
@@ -227,17 +219,21 @@ trait HandlesDeletes
             ], 200);
         }
 
-        // Web only: require controller to define $viewFolder
         if (!property_exists($this, 'viewFolder') || empty($this->viewFolder)) {
             return redirect()->back()->with('error', 'View folder is not configured for this controller.');
         }
 
-        return view($this->viewFolder . '.trash', compact('items', 'trashedTotal'));
+        $view = view($this->viewFolder . '.trash', compact('items', 'trashedTotal', 'filteredTotal'));
+
+        // AJAX: return only the results HTML section
+        if (request()->ajax()) {
+            $sections = $view->renderSections();
+            return response($sections['crud_results'] ?? $view->render(), 200);
+        }
+
+        return $view;
     }
 
-    /**
-     * Restore single logic (used by restore()).
-     */
     public function performRestore(Model $model)
     {
         $model->restore();
@@ -253,9 +249,6 @@ trait HandlesDeletes
         return $this->deleteResponse('Restored successfully.');
     }
 
-    /**
-     * Restore bulk logic (used by restoreBulk()).
-     */
     public function performRestoreBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -284,9 +277,6 @@ trait HandlesDeletes
         return $this->deleteResponse('Selected records restored.');
     }
 
-    /**
-     * Force delete single logic (used by forceDelete()).
-     */
     public function performForceDelete(Model $model)
     {
         $model->forceDelete();
@@ -301,9 +291,6 @@ trait HandlesDeletes
         return $this->deleteResponse('Permanently deleted.');
     }
 
-    /**
-     * Force delete bulk logic (used by forceDeleteBulk()).
-     */
     public function performForceDeleteBulk(Request $request)
     {
         $ids = $this->extractIds($request);
@@ -339,7 +326,7 @@ trait HandlesDeletes
     protected function softNotSupportedResponse()
     {
         if (request()->expectsJson()) {
-            return response ()->json([
+            return response()->json([
                 'success' => false,
                 'message' => 'Soft deletes are not enabled for this resource.',
             ], 404);
@@ -350,7 +337,6 @@ trait HandlesDeletes
 
     protected function extractIds(Request $request): array
     {
-        // Supports ids[] checkboxes OR comma-separated string "1,2,3"
         $ids = $request->input('ids', []);
 
         if (is_string($ids)) {

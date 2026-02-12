@@ -53,7 +53,6 @@
       </a>
       {{BLADE_CAN_CREATE_END}}
 
-      {{-- Soft-delete UI is activated by routes, not by trait --}}
       @if($hasTrashRoute)
         {{BLADE_CAN_TRASH_BEGIN}}
         <a href="{{ route('{{ROUTE_NAME}}.trash') }}" class="btn btn-danger">
@@ -61,6 +60,21 @@
         </a>
         {{BLADE_CAN_TRASH_END}}
       @endif
+    </div>
+  </div>
+
+  {{-- Search --}}
+  <div class="mb-3">
+    <input
+      type="text"
+      class="form-control"
+      id="crudSearch"
+      placeholder="Search by ID or Name..."
+      value="{{ request('q') }}"
+      autocomplete="off"
+    >
+    <div class="form-text text-muted">
+      Searches across all pages (server-side).
     </div>
   </div>
 
@@ -73,11 +87,23 @@
               class="close-x"
               aria-label="Close"
               data-bs-dismiss="alert">×</button>
-      {{-- BS4: change data-bs-dismiss to data-dismiss --}}
     </div>
   @endif
 
-{{BULK_DELETE_BLOCK}}
+  {{-- AJAX target --}}
+  <div id="crudResults">
+    @yield('crud_results')
+  </div>
+</div>
+@endsection
+
+@section('crud_results')
+  {{-- Optional: filtered count --}}
+  <div class="text-muted small mb-2">
+    Results: {{ $filteredTotal ?? (${{MODEL_VAR_PLURAL}}->total() ?? 0) }}
+  </div>
+
+  {{BULK_DELETE_BLOCK}}
 
   {{-- Optional: showing range for current page --}}
   @if(${{MODEL_VAR_PLURAL}}->count())
@@ -90,5 +116,91 @@
   <div class="mt-3">
     {{ ${{MODEL_VAR_PLURAL}}->links('vendor.pagination.bootstrap-5') }}
   </div>
-</div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+  const input = document.getElementById('crudSearch');
+  const results = document.getElementById('crudResults');
+  if (!input || !results) return;
+
+  let timer = null;
+  let controller = null;
+
+  function withAjaxHeader() {
+    return {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'text/html'
+    };
+  }
+
+  function setQueryInUrl(q) {
+    const url = new URL(window.location.href);
+    if (q && q.trim() !== '') url.searchParams.set('q', q.trim());
+    else url.searchParams.delete('q');
+    url.searchParams.delete('page'); // reset
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  // NOTE: when we replace HTML with innerHTML, script tags won't auto-run in many browsers.
+  // So we re-run inline scripts inside the updated fragment (needed for bulk delete block).
+  function runInlineScripts(container) {
+    const scripts = Array.from(container.querySelectorAll('script'));
+    scripts.forEach(s => {
+      const n = document.createElement('script');
+      if (s.type) n.type = s.type;
+      n.text = s.text || s.textContent || '';
+      document.body.appendChild(n);
+      document.body.removeChild(n);
+    });
+  }
+
+  async function load(url) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    const res = await fetch(url, {
+      headers: withAjaxHeader(),
+      signal: controller.signal
+    });
+
+    if (!res.ok) return;
+
+    const html = await res.text();
+    results.innerHTML = html;
+    runInlineScripts(results);
+  }
+
+  function buildUrl(pageUrl) {
+    const url = new URL(pageUrl || window.location.href);
+    const q = input.value.trim();
+    if (q) url.searchParams.set('q', q);
+    else url.searchParams.delete('q');
+    return url.toString();
+  }
+
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const q = input.value;
+      setQueryInUrl(q);
+      load(buildUrl(window.location.href));
+    }, 250);
+  });
+
+  // Intercept pagination clicks inside results
+  results.addEventListener('click', function (e) {
+    const a = e.target.closest('a');
+    if (!a) return;
+
+    // only intercept pagination links
+    if (!a.closest('.pagination')) return;
+
+    e.preventDefault();
+    load(buildUrl(a.href));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
+@endpush

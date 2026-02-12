@@ -3,10 +3,8 @@
 // ============================================================================
 // FILE: stubs/controllers/web.controller.stub
 // UPDATED:
-// - Adds $policyStyle property (used by HandlesDeletes::crudAuthorize())
-// - Keeps resource methods as-is (authorization via placeholders / authorizeResource)
-// - Bulk + soft-delete custom endpoints are provided by HandlesDeletes trait
-//   (destroyBulk, trash, restore, restoreBulk, forceDelete, forceDeleteBulk)
+// - Adds server-side search (q) for index with pagination appends
+// - Supports AJAX: returns only the "crud_results" section HTML
 // ============================================================================
 
 namespace App\Http\Controllers;
@@ -16,6 +14,7 @@ namespace App\Http\Controllers;
 use App\Models\{{MODEL_CLASS}};
 use App\Http\Controllers\Concerns\HandlesDeletes;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Schema;
 
 class {{MODEL_CLASS}}Controller extends Controller
 {
@@ -48,14 +47,58 @@ class {{MODEL_CLASS}}Controller extends Controller
         return [$totalCount, $trashedTotal];
     }
 
+    /**
+     * Generic, safe search:
+     * - If table has "name" column => search by name LIKE
+     * - Always allow exact ID match when numeric
+     */
+    protected function crudApplySearch($query, ?string $q)
+    {
+        $q = trim((string) $q);
+        if ($q === '') return $query;
+
+        $model = $query->getModel();
+        $table = $model->getTable();
+
+        $hasName = Schema::hasColumn($table, 'name');
+
+        return $query->where(function ($w) use ($q, $hasName) {
+            if (is_numeric($q)) {
+                $w->orWhereKey((int) $q);
+            }
+
+            if ($hasName) {
+                $w->orWhere('name', 'like', "%{$q}%");
+            }
+        });
+    }
+
     public function index()
     {
 {{AUTH_INDEX}}
         [$totalCount, $trashedTotal] = $this->crudCounts();
 
-        ${{MODEL_VAR_PLURAL}} = $this->modelClass::query()->paginate(15);
+        $q = request('q');
 
-        return view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount', 'trashedTotal'));
+        $query = $this->modelClass::query();
+
+        $query = $this->crudApplySearch($query, $q);
+
+        ${{MODEL_VAR_PLURAL}} = $query->paginate(15)->appends([
+            'q' => $q,
+        ]);
+
+        $filteredTotal = ${{MODEL_VAR_PLURAL}}->total();
+
+        $view = view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount', 'trashedTotal', 'filteredTotal'));
+
+        // AJAX: return only the results HTML section
+        if (request()->ajax()) {
+            $sections = $view->renderSections();
+            return response($sections['crud_results'] ?? $view->render(), 200);
+        }
+
+        return $view;
     }
 
     public function create()
