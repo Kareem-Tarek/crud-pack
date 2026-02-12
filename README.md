@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 --- -->
 
-<img src="assets/logo/logo-dark.png" alt="Laravel CrudPack ToolKit logo" height="200">
+<p align="center">
+  <img
+    src="assets/logo/logo-dark.png"
+    alt="Laravel CrudPack ToolKit logo"
+    width="720"
+    style="max-width: 100%; height: auto;"
+  >
+</p>
 
 ## [0.1.0] - Initial Release
 
