@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - All generated code is intended to be edited and customized by developers.
 ---
 
-> **Note:**<br/>This is important, but you can read it later.  
+> **Note:**<br/>This is important, but you can read it later.<br/>
 > Let’s jump to the core topic:
 
 ## 👉 **[CLICK HERE](#these-topics-will-already-be-discussed-below-%EF%B8%8F-later-on)**
