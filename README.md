@@ -164,21 +164,21 @@ php artisan crud:install
 ```
 This ``` crud:install ``` command scaffolds all of the following...
 
-**layout views**:
-- ``` resources/views/layouts/app.blade.php ```
-- ``` resources/views/layouts/navigation.blade.php ```
-- ``` resources/views/welcome.blade.php ``` (**Don’t skip this!** — Make sure you read this page after running the local development server ``` php artisan serve ```.)
+- **layout views**:
+  - ``` resources/views/layouts/app.blade.php ```
+  - ``` resources/views/layouts/navigation.blade.php ```
+  - ``` resources/views/welcome.blade.php ``` (**Don’t skip this!** — Make sure you read this page after running the local development server ``` php artisan serve ```.)
 
-**Laravel pagination views**:
-- ``` resources\views\vendor\pagination\ALL_PAGINATION_BLADES ```
+- **Laravel pagination views**:
+  - ``` resources\views\vendor\pagination\ALL_PAGINATION_BLADES ```
 
-**Assets (within the ``` resources/views/layouts/app.blade.php ```)**:
-- Bootstrap 5 CDN (CSS & JS)
-- Font Awesome 7.0.1 CDNJS (CSS & JS)
-- @stack('styles') and @stack('scripts')
+- **Assets (within the ``` resources/views/layouts/app.blade.php ```)**:
+  - Bootstrap 5 CDN (CSS & JS)
+  - Font Awesome 7.0.1 CDNJS (CSS & JS)
+  - @stack('styles') and @stack('scripts')
 
-**Config**:
-- ``` config\crud-pack.php ```
+- **Config**:
+  - ``` config\crud-pack.php ```
 <br/>
 
 To override without prompts:
