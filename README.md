@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 >
 > **Let’s jump to the core topic:**
 
-## 👉 **[CLICK HERE](#-lets-get-started-)**
+## 👉 **[CLICK HERE](#get-started)**
 
 ### Some considerations needs to be addressed (optional you could read later):
 
@@ -97,6 +97,8 @@ Policy authorization styles (Note):
 
 ## **These topics will already be discussed below ⬇️ later on!**
 ---
+<a id="get-started"></a>
+
 # ⬇️ Lets get started❗ ⬇️
 # CRUD Pack `(kareemtarek/crud-pack)`
 
