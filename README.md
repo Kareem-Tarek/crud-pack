@@ -162,7 +162,7 @@ After installing the package
 ```bash
 php artisan crud:install
 ```
-This scaffolds the all the following...
+This ``` crud:install ``` command scaffolds the all of the following...
 
 **layout views**:
 - ``` resources/views/layouts/app.blade.php ```
