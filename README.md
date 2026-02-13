@@ -153,12 +153,12 @@ The goal is **speed without sacrificing control**.
 ---
 
 ## Installation
-After installing the package:
+To install the package issue this command:
 ```bash
 composer require kareemtarek/crud-pack
 ```
 
-After installing the package
+After installing the package run the following install command:
 ```bash
 php artisan crud:install
 ```
