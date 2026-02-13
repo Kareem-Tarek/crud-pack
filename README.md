@@ -162,13 +162,22 @@ After installing the package
 ```bash
 php artisan crud:install
 ```
-This scaffolds the **layout views**:
+This scaffolds the all the following... 
+**layout views**:
 - ``` resources/views/layouts/app.blade.php ```
 - ``` resources/views/layouts/navigation.blade.php ```
 - ``` resources/views/welcome.blade.php ```
 
-And also the **Laravel pagination views**:
+**Laravel pagination views**:
 - ``` resources\views\vendor\pagination\ALL_PAGINATION_BLADES ```
+
+**Assets (within the ``` resources/views/layouts/app.blade.php ```)**:
+- Bootstrap 5 CDN (CSS & JS)
+- Font Awesome 7.0.1 CDNJS (CSS & JS)
+- @stack('styles') and @stack('scripts')
+
+**Config**:
+- ``` config\crud-pack.php ```
 
 To override without prompts:
 ```bash
