@@ -181,7 +181,7 @@ This ``` crud:install ``` command scaffolds all of the following...
   - ``` config\crud-pack.php ```
 <br/>
 
-To override without prompts:
+To override all the previous scaffolded files (without prompts):
 ```bash
 php artisan crud:install --force
 ```
