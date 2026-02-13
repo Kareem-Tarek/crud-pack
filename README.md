@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 >
 > **Let’s jump to the core topic:**
 
-## 👉 **[CLICK HERE](#these-topics-will-already-be-discussed-below-%EF%B8%8F-later-on)**
+## 👉 **[CLICK HERE](#-lets-get-started-)**
 
 ### Some considerations needs to be addressed (optional you could read later):
 
