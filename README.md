@@ -99,7 +99,7 @@ Policy authorization styles (Note):
 ---
 <a id="get-started"></a>
 
-# ⬇️ Lets get started❗ ⬇️
+# ⬇️ Lets get started ✨🚀 ⬇️
 # CRUD Pack `(kareemtarek/crud-pack)`
 
 CRUD Pack is a **blueprint-first Laravel CRUD generator** that allows developers to scaffold complete CRUD resources (Web or API) using a single Artisan command, while strictly following Laravel conventions.
