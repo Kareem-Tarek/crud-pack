@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - All generated code is intended to be edited and customized by developers.
 ---
 
-> [!Attention:]
+> [!Attention]
 > This is important, but you can read it later.
 >
 > **Let’s jump to the core topic:**
