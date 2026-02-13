@@ -153,15 +153,26 @@ The goal is **speed without sacrificing control**.
 ---
 
 ## Installation
-After installing the package
+After installing the package:
 ```bash
 composer require kareemtarek/crud-pack
-php artisan crud-pack:install
 ```
+
+After installing the package
+```bash
+php artisan crud:install
+```
+This scaffolds the **layout views**:
+- ``` resources/views/layouts/app.blade.php ```
+- ``` resources/views/layouts/navigation.blade.php ```
+- ``` resources/views/welcome.blade.php ```
+
+And also the **Laravel pagination views**:
+- ``` resources\views\vendor\pagination\ALL_PAGINATION_BLADES ```
 
 To override without prompts:
 ```bash
-php artisan crud-pack:install --force
+php artisan crud:install --force
 ```
 
 ## Lets jump into the package instructions ⤵️
