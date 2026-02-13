@@ -162,12 +162,12 @@ After installing the package run the following install command:
 ```bash
 php artisan crud:install
 ```
-This ``` crud:install ``` command scaffolds the all of the following...
+This ``` crud:install ``` command scaffolds all of the following...
 
 **layout views**:
 - ``` resources/views/layouts/app.blade.php ```
 - ``` resources/views/layouts/navigation.blade.php ```
-- ``` resources/views/welcome.blade.php ```
+- ``` resources/views/welcome.blade.php ``` (**Don’t skip this!** — Make sure you read this page after running the local development server ``` php artisan serve ```.)
 
 **Laravel pagination views**:
 - ``` resources\views\vendor\pagination\ALL_PAGINATION_BLADES ```
