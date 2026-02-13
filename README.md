@@ -56,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ---
 
 > [!NOTE]
-> ## **Attention**
+> ## **Attention❗**
 > This is important, but you can read it later.
 >
 > **Let’s jump to the core topic:**
