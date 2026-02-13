@@ -55,25 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - All generated code is intended to be edited and customized by developers.
 ---
 
-> [!NOTE]
+> [!Attention:]
 > This is important, but you can read it later.
 >
-> Let’s jump to the core topic:
+> **Let’s jump to the core topic:**
 
 ## 👉 **[CLICK HERE](#these-topics-will-already-be-discussed-below-%EF%B8%8F-later-on)**
-
-> ✨ **Attention:**<br/>
-> This is important, but you can read it later.<br/><br/>
-> Let’s jump to the core topic:
-
-## 👉 **[CLICK HERE](#these-topics-will-already-be-discussed-below-%EF%B8%8F-later-on)**
-
-> ℹ️ **Heads up:**<br/>
-> This is important, but you can read it later.<br/><br/>
-> Let’s jump to the core topic:
-
-## 👉 **[CLICK HERE](#these-topics-will-already-be-discussed-below-%EF%B8%8F-later-on)**
-
 
 ### Some considerations needs to be addressed (optional you could read later):
 
