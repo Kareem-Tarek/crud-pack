@@ -1,6 +1,6 @@
 {
   "name": "kareemtarek/crud-pack",
-  "description": "A comprehensive full-stack CRUD scaffolding layer built on a reusable Laravel CRUD generator → Controllers (Web/API), FormRequests (validation), Models, Migrations, Policies (multiple auth styles), Views (Blades), Routes (Web/API), Postman collection (from API routes).",
+  "description": "A comprehensive full-stack CRUD scaffolding framework layer built on a reusable Laravel CRUD generator → Controllers (Web/API), FormRequests (validation), Models, Migrations, Policies (multiple auth styles), Views (Blades), Routes (Web/API), Postman collection (from API routes).",
   "type": "library",
   "license": "MIT",
   "authors": [
