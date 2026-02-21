@@ -909,7 +909,7 @@ $authRepl = $this->controllerAuthReplacements(
         }
 
         if ($hasBlock) {
-            $pattern = '/' . preg_quote($start, '/') . '.?' . preg_quote($end, '/') . '\s/s';
+            $pattern = '/' . preg_quote($start, '/') . '.*?' . preg_quote($end, '/') . '\s*/s';
             $contents = preg_replace($pattern, $block, $contents);
         } else {
             $contents .= "\n" . $block;

@@ -46,6 +46,10 @@
   $forceBulkUrl   = $hasForceBulk ? route('{{ROUTE_NAME}}.forceDeleteBulk') : null;
 
   $softRoutesOk = $hasRestore && $hasForceDelete && $hasRestoreBulk && $hasForceBulk;
+
+  // Added: avoid RouteNotFoundException if trashSearch route is missing
+  $hasTrashSearch = \Illuminate\Support\Facades\Route::has('{{ROUTE_NAME}}.trashSearch');
+  $trashSearchUrl = $hasTrashSearch ? route('{{ROUTE_NAME}}.trashSearch') : null;
 @endphp
 
 <div class="container py-4">
@@ -74,7 +78,7 @@
         class="form-control"
         placeholder="Search trashed {{MODEL_CLASS}}..."
         autocomplete="off"
-        {{ $softRoutesOk ? '' : 'disabled' }}
+        {{ ($softRoutesOk && $hasTrashSearch) ? '' : 'disabled' }}
       >
       <small class="text-muted d-block mt-1">
         Type to search across all trashed records. Clear to return to normal trash list.
@@ -220,6 +224,9 @@
   const softRoutesOk = {{ $softRoutesOk ? 'true' : 'false' }};
   if (!softRoutesOk) return;
 
+  // Added: if route missing, do not crash JS
+  const SEARCH_URL = @json($trashSearchUrl);
+
   // ==========
   // Bulk logic initializer (so it works after AJAX replacement or restore)
   // ==========
@@ -228,7 +235,7 @@
     const forceBulkUrl   = @json($forceBulkUrl);
 
     const selectAll = document.getElementById('selectAllTrashed');
-    const checks = Array.from(document.querySelectorAll('.row-check-trashed'));
+    let checks = Array.from(document.querySelectorAll('.row-check-trashed'));
     const restoreBtn = document.getElementById('bulkRestoreBtn');
     const forceBtn = document.getElementById('bulkForceBtn');
 
@@ -257,15 +264,23 @@
     const selectAllClone = selectAll.cloneNode(true);
     selectAll.parentNode.replaceChild(selectAllClone, selectAll);
 
+    // Clone each row checkbox to wipe any previous listeners
+    checks.forEach(c => {
+      const clone = c.cloneNode(true);
+      c.parentNode.replaceChild(clone, c);
+    });
+
+    // Re-bind checks to the newly cloned elements
+    checks = Array.from(document.querySelectorAll('.row-check-trashed'));
+
+    // Bind listeners using the NEW nodes
     selectAllClone.addEventListener('change', function () {
       checks.forEach(c => c.checked = selectAllClone.checked);
       syncState();
     });
 
     checks.forEach(c => {
-      const clone = c.cloneNode(true);
-      c.parentNode.replaceChild(clone, c);
-      clone.addEventListener('change', syncState);
+      c.addEventListener('change', syncState);
     });
 
     function submitBulk(url, method, confirmMsg) {
@@ -322,14 +337,10 @@
 
   if (!input || !wrap) return;
 
+  // If trashSearch route not present, stop here (no errors)
+  if (!SEARCH_URL) return;
+
   const initialHtml = wrap.innerHTML;
-
-  // Replace this with your real trash-search route name (already implemented on your side)
-  // Must return HTML snippet for #crudTrashResults content.
-  const SEARCH_URL = @json(route('{{ROUTE_NAME}}.trashSearch'));
-
-  let t = null;
-  let lastQuery = '';
 
   function setStatus(msg) {
     if (status) status.textContent = msg || '';
@@ -374,6 +385,9 @@
       initTrashBulk();
     }
   }
+
+  let t = null;
+  let lastQuery = '';
 
   input.addEventListener('input', function () {
     const q = (input.value || '').trim();
