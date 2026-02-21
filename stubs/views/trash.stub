@@ -236,8 +236,8 @@
 
     const selectAll = document.getElementById('selectAllTrashed');
     let checks = Array.from(document.querySelectorAll('.row-check-trashed'));
-    let restoreBtn = document.getElementById('bulkRestoreBtn'); // ✅ changed to let
-    let forceBtn   = document.getElementById('bulkForceBtn');   // ✅ changed to let
+    let restoreBtn = document.getElementById('bulkRestoreBtn');
+    let forceBtn   = document.getElementById('bulkForceBtn');
 
     const bulkForm = document.getElementById('bulkTrashedForm');
     const idsInput = document.getElementById('trashedIds');
@@ -252,7 +252,7 @@
       const ids = selectedIds();
       const anyChecked = ids.length > 0;
 
-      // ✅ now points to the CURRENT (cloned) buttons
+      // now points to the CURRENT (cloned) buttons
       if (restoreBtn) restoreBtn.disabled = !anyChecked;
       if (forceBtn) forceBtn.disabled = !anyChecked;
 
@@ -311,7 +311,7 @@
       const restoreClone = restoreBtn.cloneNode(true);
       restoreBtn.parentNode.replaceChild(restoreClone, restoreBtn);
 
-      // ✅ re-bind variable to the NEW button
+      // re-bind variable to the NEW button
       restoreBtn = restoreClone;
 
       restoreBtn.addEventListener('click', () =>
@@ -323,7 +323,7 @@
       const forceClone = forceBtn.cloneNode(true);
       forceBtn.parentNode.replaceChild(forceClone, forceBtn);
 
-      // ✅ re-bind variable to the NEW button
+      // re-bind variable to the NEW button
       forceBtn = forceClone;
 
       forceBtn.addEventListener('click', () =>
