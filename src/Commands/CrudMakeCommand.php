@@ -572,8 +572,6 @@ class CrudMakeCommand extends Command
     /* ============================================================
      | Controller Generation
      ============================================================ */
-    protected 
-
     protected function generateService(string $modelClass, bool $force): void
     {
         $stub = $this->stubPath('services/service.stub');

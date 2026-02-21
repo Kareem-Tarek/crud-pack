@@ -470,7 +470,7 @@ When views are enabled, CRUD Pack generates **Bootstrap 5–based Blade template
 - trash (soft-deleted records)
 
 Note:
-  - All of the blade will be in that location ``` resources/views/resource_name_plural/BLADES_HERE ```, except the "**_form.blade.php**" will be in that location "``` resources/views/resource_name_plural/partials ```"
+  - All of the blades will be in that location ``` resources/views/resource_name_plural/BLADES_HERE ```, except for the "**_form.blade.php**" will be in that location "``` resources/views/resource_name_plural/partials ```"
     - Example: ``` resources/views/products/BLADES_HERE ``` and ``` resources/views/products/partials/_form.blade.php ```
 
 ### View Features
