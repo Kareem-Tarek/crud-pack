@@ -91,11 +91,10 @@ class CrudMakeCommand extends Command
         }
 
         if (!$soft && !$noSoft) {
-            $choice = $this->choice('Soft deletes?', ['soft-deletes', 'no-soft-deletes'], 0);
+            $choice = $this->choice('Soft deletes?', ['soft-deletes', 'no-soft-deletes'], 1);
             $soft = $choice === 'soft-deletes';
             $noSoft = !$soft;
         }
-
         
         /* ===========================
          | Required: Service Layer Mode
@@ -833,14 +832,15 @@ $authRepl = $this->controllerAuthReplacements(
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
+        $lines[] = "";
 
-        // Server-side realtime search endpoints (used by generated views)
-        // - index search: maps to index() which supports q + AJAX partial return
+        // Realtime search route (hits index with q and AJAX section render).
         if ($isWeb) {
             $lines[] = "Route::get('{$uri}/search', [{$controllerFqn}, 'index'])->name('{$routeName}.search');";
+        } else {
+            $lines[] = "Route::get('{$uri}/search', [{$controllerFqn}, 'index'])->name('api.{$routeName}.search');";
         }
 
-        $lines[] = "";
 
         $softRoutes = [];
 
@@ -853,6 +853,7 @@ $authRepl = $this->controllerAuthReplacements(
             $softRoutes[] = "Route::delete('{$uri}/force-bulk', [{$controllerFqn}, 'forceDeleteBulk'])->name('{$routeName}.forceDeleteBulk');";
         } else {
             $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('api.{$routeName}.trash');";
+            $softRoutes[] = "Route::get('{$uri}/trash/search', [{$controllerFqn}, 'trash'])->name('api.{$routeName}.trashSearch');";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('api.{$routeName}.restore');";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('api.{$routeName}.restoreBulk');";
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('api.{$routeName}.forceDelete');";

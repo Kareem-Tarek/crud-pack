@@ -104,7 +104,6 @@
   @endif
 
   {{-- EVERYTHING that gets replaced by trash-search lives inside this wrapper --}}
-@section('crud_results')
   <div id="crudTrashResults">
     {{-- Bulk Actions Toolbar (NOT wrapping table) --}}
     <div class="card mb-3">
@@ -210,7 +209,6 @@
       {{ $items->links('vendor.pagination.bootstrap-5') }}
     </div>
   </div>
-@show
 </div>
 @endsection
 
