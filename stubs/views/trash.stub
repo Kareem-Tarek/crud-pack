@@ -236,8 +236,8 @@
 
     const selectAll = document.getElementById('selectAllTrashed');
     let checks = Array.from(document.querySelectorAll('.row-check-trashed'));
-    const restoreBtn = document.getElementById('bulkRestoreBtn');
-    const forceBtn = document.getElementById('bulkForceBtn');
+    let restoreBtn = document.getElementById('bulkRestoreBtn'); // ✅ changed to let
+    let forceBtn   = document.getElementById('bulkForceBtn');   // ✅ changed to let
 
     const bulkForm = document.getElementById('bulkTrashedForm');
     const idsInput = document.getElementById('trashedIds');
@@ -252,6 +252,7 @@
       const ids = selectedIds();
       const anyChecked = ids.length > 0;
 
+      // ✅ now points to the CURRENT (cloned) buttons
       if (restoreBtn) restoreBtn.disabled = !anyChecked;
       if (forceBtn) forceBtn.disabled = !anyChecked;
 
@@ -309,7 +310,11 @@
     if (restoreBtn) {
       const restoreClone = restoreBtn.cloneNode(true);
       restoreBtn.parentNode.replaceChild(restoreClone, restoreBtn);
-      restoreClone.addEventListener('click', () =>
+
+      // ✅ re-bind variable to the NEW button
+      restoreBtn = restoreClone;
+
+      restoreBtn.addEventListener('click', () =>
         submitBulk(restoreBulkUrl, "POST", "Restore selected records?")
       );
     }
@@ -317,7 +322,11 @@
     if (forceBtn) {
       const forceClone = forceBtn.cloneNode(true);
       forceBtn.parentNode.replaceChild(forceClone, forceBtn);
-      forceClone.addEventListener('click', () =>
+
+      // ✅ re-bind variable to the NEW button
+      forceBtn = forceClone;
+
+      forceBtn.addEventListener('click', () =>
         submitBulk(forceBulkUrl, "DELETE", "Permanently delete selected records?")
       );
     }
