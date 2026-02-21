@@ -835,12 +835,20 @@ $authRepl = $this->controllerAuthReplacements(
             $lines[] = "Route::delete('{$uri}/bulk', [{$controllerFqn}, 'destroyBulk'])->name('api.{$routeName}.destroyBulk');";
         }
 
+
+        // Server-side realtime search endpoints (used by generated views)
+        // - index search: maps to index() which supports q + AJAX partial return
+        if ($isWeb) {
+            $lines[] = "Route::get('{$uri}/search', [{$controllerFqn}, 'index'])->name('{$routeName}.search');";
+        }
+
         $lines[] = "";
 
         $softRoutes = [];
 
         if ($isWeb) {
             $softRoutes[] = "Route::get('{$uri}/trash', [{$controllerFqn}, 'trash'])->name('{$routeName}.trash');";
+            $softRoutes[] = "Route::get('{$uri}/trash/search', [{$controllerFqn}, 'trash'])->name('{$routeName}.trashSearch');";
             $softRoutes[] = "Route::post('{$uri}/{id}/restore', [{$controllerFqn}, 'restore'])->name('{$routeName}.restore');";
             $softRoutes[] = "Route::post('{$uri}/restore-bulk', [{$controllerFqn}, 'restoreBulk'])->name('{$routeName}.restoreBulk');";
             $softRoutes[] = "Route::delete('{$uri}/{id}/force', [{$controllerFqn}, 'forceDelete'])->name('{$routeName}.forceDelete');";

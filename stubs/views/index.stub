@@ -102,6 +102,7 @@
   @endif
 
   {{-- EVERYTHING that gets replaced by search lives inside this wrapper --}}
+@section('crud_results')
   <div id="crudResults">
     {{BULK_DELETE_BLOCK}}
 
@@ -117,6 +118,7 @@
       {{ ${{MODEL_VAR_PLURAL}}->links('vendor.pagination.bootstrap-5') }}
     </div>
   </div>
+@show
 </div>
 @endsection
 
