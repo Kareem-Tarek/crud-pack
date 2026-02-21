@@ -20,7 +20,7 @@
         @csrf
         @method('PUT')
 
-        @include('{{VIEW_FOLDER}}._form')
+        @include('{{VIEW_FOLDER}}.partials._form')
 
         <div class="d-flex gap-2">
           <button class="btn btn-primary">Update</button>

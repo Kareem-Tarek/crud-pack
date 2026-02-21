@@ -7,7 +7,7 @@
 // - Trash (web) supports AJAX: returns only "crud_results" section HTML
 // ============================================================================
 
-namespace App\Http\Controllers\Concerns;
+namespace App\Traits;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;

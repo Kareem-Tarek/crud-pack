@@ -24,7 +24,7 @@ class CrudPackTraitCommand extends Command
 
     public function handle(): int
     {
-        $target = app_path('Http/Controllers/Concerns/HandlesDeletes.php');
+        $target = app_path('Traits/HandlesDeletes.php');
         $stub   = $this->stubPath('traits/HandlesDeletes.stub');
 
         if (!$this->files->exists($stub)) {

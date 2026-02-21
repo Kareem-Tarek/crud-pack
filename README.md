@@ -363,7 +363,7 @@ CRUD Pack uses **one shared delete-handling trait** across the entire applicatio
 
 ### Trait Location
 ```bash
-app/Http/Controllers/Concerns/HandlesDeletes.php
+app/Traits/HandlesDeletes.php
 ```
 
 #### To create (if not existing)/replace (if existing) the HandlesDeletes.php trait with prompting [and that is for any updates made from the package, and if you want to recreate the file to pull the same original again or any updated logic] + including soft-delete & non-soft-deletes methods
@@ -391,7 +391,7 @@ This ensures:
 - Reusable behavior across all controllers
 ---
 ## Delete & Soft-Delete Endpoints (Trait Methods)
-All delete-related endpoints live **directly inside the trait** (path: **app\Http\Controllers\Concerns\HandlesDeletes.php**), not in controllers (but using it (the **HandlesDeletes.php** trait) inside the controllers).
+All delete-related endpoints live **directly inside the trait** (path: **app\Traits\HandlesDeletes.php**), not in controllers (but using it (the **HandlesDeletes.php** trait) inside the controllers).
 
 ### Methods Provided
 ``` destroy ``` — single record delete (resource method)
@@ -406,14 +406,14 @@ All delete-related endpoints live **directly inside the trait** (path: **app\Htt
 - ``` destroy ``` and ``` destroyBulk ``` is **always active**
 - The other six methods are soft-delete related
   1] performDestroy
-    - this is related to the controller (resource methods) but, the core logic is written here since in the "``` app\Http\Controllers\Concerns\HandlesDeletes.php ```" has all the delete methods **--soft-deletes** and **--no-soft-deletes**
+    - this is related to the controller (resource methods) but, the core logic is written here since in the "``` app\Traits\HandlesDeletes.php ```" has all the delete methods **--soft-deletes** and **--no-soft-deletes**
   2] performDestroyBulk
   3] trash
   4] restore
   5] restoreBulk
   6] forceDelete
   7] forceDeleteBulk
-- The trait (``` app\Http\Controllers\Concerns\HandlesDeletes.php ```) always contains real logic (**the 7 methods mentioned above**)
+- The trait (``` app\Traits\HandlesDeletes.php ```) always contains real logic (**the 7 methods mentioned above**)
 - Methods are enabled/disabled via **routes**, not by modifying the trait
 - Responses automatically adapt:
     - JSON for API
@@ -468,6 +468,10 @@ When views are enabled, CRUD Pack generates **Bootstrap 5–based Blade template
 - show
 - ``` _form ``` (shared with create & edit blades)
 - trash (soft-deleted records)
+
+Note:
+  - All of the blade will be in that location ``` resources/views/resource_name_plural/BLADES_HERE ```, except the "**_form.blade.php**" will be in that location "``` resources/views/resource_name_plural/partials ```"
+    - Example: ``` resources/views/products/BLADES_HERE ``` and ``` resources/views/products/partials/_form.blade.php ```
 
 ### View Features
 - Checkbox selection + select-all

@@ -34,6 +34,8 @@ class CrudMakeCommand extends Command
         {--api : Generate an API controller}
         {--soft-deletes : Enable soft deletes}
         {--no-soft-deletes : Disable soft deletes}
+        {--service : Generate a Service layer for this resource}
+        {--no-service : Do NOT generate a Service layer}
         {--all : Generate all optional files (dynamic, exclusive)}
         {--routes : Append routes to routes/web.php or routes/api.php}
         {--request : Generate FormRequest}
@@ -94,7 +96,24 @@ class CrudMakeCommand extends Command
             $noSoft = !$soft;
         }
 
+        
         /* ===========================
+         | Required: Service Layer Mode
+         =========================== */
+        $useService = (bool) $this->option('service');
+        $noService  = (bool) $this->option('no-service');
+
+        if ($useService && $noService) {
+            $this->error('Choose either --service or --no-service, not both.');
+            return self::FAILURE;
+        }
+
+        if (!$useService && !$noService) {
+            // Mandatory prompt (default = no)
+            $useService = $this->confirm('Generate a service layer for this resource?', false);
+            $noService  = !$useService;
+        }
+/* ===========================
          | --all exclusivity + Wizard
          =========================== */
         $allProvided = $this->optionWasProvided('all');
@@ -177,10 +196,21 @@ class CrudMakeCommand extends Command
         $this->ensureSharedTrait(force: $force);
 
         /* ===========================
+         | 2) Service (optional)
+         =========================== */
+        if ($useService) {
+            $this->generateService(
+                modelClass: $modelClass,
+                force: $force
+            );
+        }
+
+/* ===========================
          | 2) Controller (always)
          =========================== */
         $this->generateController(
             isWeb: $isWeb,
+            useService: $useService,
             generateRequest: $generateRequest,
             generatePolicy: $generatePolicy,
             policyStyle: $policyStyle,
@@ -341,8 +371,8 @@ class CrudMakeCommand extends Command
             );
 
             $this->generateFromStub(
-                stub: $this->stubPath('views/_form.stub'),
-                target: "{$viewsDir}/_form.blade.php",
+                stub: $this->stubPath('views/partials/_form.stub'),
+                target: "{$viewsDir}/partials/_form.blade.php",
                 replacements: [
                     '{{MODEL_VAR}}' => $modelVar,
                 ],
@@ -524,7 +554,7 @@ class CrudMakeCommand extends Command
      ============================================================ */
     protected function ensureSharedTrait(bool $force): void
     {
-        $target = app_path('Http/Controllers/Concerns/HandlesDeletes.php');
+        $target = app_path('Traits/HandlesDeletes.php');
 
         if ($this->files->exists($target) && !$force) {
             return;
@@ -542,8 +572,27 @@ class CrudMakeCommand extends Command
     /* ============================================================
      | Controller Generation
      ============================================================ */
-    protected function generateController(
+    protected 
+
+    protected function generateService(string $modelClass, bool $force): void
+    {
+        $stub = $this->stubPath('services/service.stub');
+        $target = app_path("Services/{$modelClass}Service.php");
+
+        $this->generateFromStub(
+            stub: $stub,
+            target: $target,
+            replacements: [
+                '{{MODEL_CLASS}}' => $modelClass,
+            ],
+            force: $force,
+            askReplaceIfExists: true
+        );
+    }
+
+function generateController(
         bool $isWeb,
+        bool $useService,
         bool $generateRequest,
         bool $generatePolicy,
         string $policyStyle,
@@ -556,7 +605,9 @@ class CrudMakeCommand extends Command
         bool $soft,
         bool $force
     ): void {
-        $stub = $isWeb ? 'controllers/web.controller.stub' : 'controllers/api.controller.stub';
+        $stub = $isWeb
+            ? ($useService ? 'controllers/web.controller.service.stub' : 'controllers/web.controller.stub')
+            : ($useService ? 'controllers/api.controller.service.stub' : 'controllers/api.controller.stub');
 
         // ALWAYS import Illuminate\Http\Request (needed for destroyBulk + other custom endpoints).
         $requestImport = "use Illuminate\\Http\\Request;\n";
@@ -573,11 +624,25 @@ class CrudMakeCommand extends Command
         $classTraits = 'use HandlesDeletes;';
         $constructor = '';
 
+        $serviceCtorParam = $useService ? "{$modelClass}Service \$service" : '';
+        $serviceCtorPromoted = $useService ? "private {$modelClass}Service \$service" : '';
+        $serviceCtorSignature = $useService ? "public function __construct({$serviceCtorPromoted})" : "public function __construct()";
+
         if ($generatePolicy && $policyStyle === 'resource') {
             $authImport = "use Illuminate\\Foundation\\Auth\\Access\\AuthorizesRequests;\n";
             $classTraits = "use AuthorizesRequests, HandlesDeletes;";
 
-            $constructor = <<<PHP
+            if ($useService) {
+                $constructor = <<<PHP
+
+    public function __construct(private {$modelClass}Service \$service)
+    {
+        \$this->authorizeResource({$modelClass}::class, '{$modelVar}');
+    }
+
+PHP;
+            } else {
+                $constructor = <<<PHP
 
     public function __construct()
     {
@@ -585,9 +650,18 @@ class CrudMakeCommand extends Command
     }
 
 PHP;
-        }
+            }
+        } elseif ($useService) {
+            // Service enabled, non-resource policy style (or no policy)
+            $constructor = <<<PHP
 
-        $authRepl = $this->controllerAuthReplacements(
+    public function __construct(private {$modelClass}Service \$service)
+    {
+    }
+
+PHP;
+        }
+$authRepl = $this->controllerAuthReplacements(
             policyStyle: $generatePolicy ? $policyStyle : 'none',
             modelClass: $modelClass,
             modelVar: $modelVar

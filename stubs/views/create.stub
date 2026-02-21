@@ -17,7 +17,7 @@
       <form method="POST" action="{{ route('{{ROUTE_NAME}}.store') }}">
         @csrf
 
-        @include('{{VIEW_FOLDER}}._form')
+        @include('{{VIEW_FOLDER}}.partials._form')
 
         <div class="d-flex gap-2">
           <button class="btn btn-success">Save</button>

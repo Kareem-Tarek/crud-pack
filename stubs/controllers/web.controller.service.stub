@@ -12,6 +12,7 @@ namespace App\Http\Controllers;
 {{REQUEST_IMPORT}}
 {{AUTH_IMPORT}}
 use App\Models\{{MODEL_CLASS}};
+use App\Services\{{MODEL_CLASS}}Service;
 use App\Traits\HandlesDeletes;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
@@ -76,19 +77,9 @@ class {{MODEL_CLASS}}Controller extends Controller
     public function index()
     {
 {{AUTH_INDEX}}
-        [$totalCount, $trashedTotal] = $this->crudCounts();
-
         $q = request('q');
 
-        $query = $this->modelClass::query();
-
-        $query = $this->crudApplySearch($query, $q);
-
-        ${{MODEL_VAR_PLURAL}} = $query->paginate(15)->appends([
-            'q' => $q,
-        ]);
-
-        $filteredTotal = ${{MODEL_VAR_PLURAL}}->total();
+        [${{MODEL_VAR_PLURAL}}, $totalCount, $trashedTotal, $filteredTotal] = $this->service->paginate($q, 15);
 
         $view = view('{{VIEW_FOLDER}}.index', compact('{{MODEL_VAR_PLURAL}}', 'totalCount', 'trashedTotal', 'filteredTotal'));
 
@@ -115,7 +106,7 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
 {{AUTH_STORE}}
         try {
-            {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+            $this->service->store({{REQUEST_DATA}});
 
             return redirect()
                 ->route('{{ROUTE_NAME}}.index')
@@ -153,7 +144,7 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
 {{AUTH_UPDATE}}
         try {
-            ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+            $this->service->update(${{MODEL_VAR}}, {{REQUEST_DATA}});
 
             return redirect()
                 ->route('{{ROUTE_NAME}}.index')

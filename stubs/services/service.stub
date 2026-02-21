@@ -1,0 +1,92 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\{{MODEL_CLASS}};
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
+
+class {{MODEL_CLASS}}Service
+{
+    protected string $modelClass = {{MODEL_CLASS}}::class;
+
+    /**
+     * Non-delete operations
+     */
+    public function paginate(?string $q = null, int $perPage = 15): array
+    {
+        [$totalCount, $trashedTotal] = $this->counts();
+
+        $query = $this->modelClass::query();
+        $query = $this->applySearch($query, $q);
+
+        $items = $query->paginate($perPage)->appends(['q' => $q]);
+        $filteredTotal = $items->total();
+
+        return [$items, $totalCount, $trashedTotal, $filteredTotal];
+    }
+
+    public function store(array $data): {{MODEL_CLASS}}
+    {
+        return {{MODEL_CLASS}}::create($data);
+    }
+
+    public function update({{MODEL_CLASS}} $model, array $data): {{MODEL_CLASS}}
+    {
+        $model->update($data);
+        return $model;
+    }
+
+    public function show({{MODEL_CLASS}} $model): {{MODEL_CLASS}}
+    {
+        return $model;
+    }
+
+    /**
+     * Counts used by web nav + API metadata
+     */
+    public function counts(): array
+    {
+        $totalCount = $this->modelClass::query()->count();
+
+        $trashedTotal = 0;
+        if ($this->supportsSoftDeletes()) {
+            $trashedTotal = $this->modelClass::onlyTrashed()->count();
+        }
+
+        return [$totalCount, $trashedTotal];
+    }
+
+    /**
+     * Generic, safe search:
+     * - If table has "name" column => search by name LIKE
+     * - Always allow exact ID match when numeric
+     */
+    protected function applySearch(Builder $query, ?string $q): Builder
+    {
+        $q = trim((string) $q);
+        if ($q === '') return $query;
+
+        $model = $query->getModel();
+        $table = $model->getTable();
+
+        $hasName = Schema::hasColumn($table, 'name');
+
+        return $query->where(function ($w) use ($q, $hasName) {
+            if (is_numeric($q)) {
+                $w->orWhereKey((int) $q);
+            }
+
+            if ($hasName) {
+                $w->orWhere('name', 'like', "%{$q}%");
+            }
+        });
+    }
+
+    protected function supportsSoftDeletes(): bool
+    {
+        $uses = class_uses_recursive($this->modelClass) ?: [];
+        return in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, $uses, true);
+    }
+}

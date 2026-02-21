@@ -14,6 +14,7 @@ namespace App\Http\Controllers\Api;
 {{REQUEST_IMPORT}}
 {{AUTH_IMPORT}}
 use App\Models\{{MODEL_CLASS}};
+use App\Services\{{MODEL_CLASS}}Service;
 use App\Http\Controllers\Controller;
 use App\Traits\HandlesDeletes;
 use Illuminate\Database\QueryException;
@@ -37,10 +38,7 @@ class {{MODEL_CLASS}}Controller extends Controller
         {{AUTH_INDEX}}
 
         try {
-            $query = {{MODEL_CLASS}}::query();
-
-            $totalCount = $query->count();
-            $items = $query->paginate(15);
+            [$items, $totalCount, $trashedTotal, $filteredTotal] = $this->service->paginate(request('q'), 15);
 
             return response()->json([
                 'success'    => true,
@@ -68,7 +66,7 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
 {{AUTH_STORE}}
         try {
-            $item = {{MODEL_CLASS}}::create({{REQUEST_DATA}});
+            $item = $this->service->store({{REQUEST_DATA}});
 
             return response()->json([
                 'success' => true,
@@ -102,7 +100,7 @@ class {{MODEL_CLASS}}Controller extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => ${{MODEL_VAR}},
+            'data'    => $item,
         ], 200);
     }
 
@@ -110,12 +108,12 @@ class {{MODEL_CLASS}}Controller extends Controller
     {
 {{AUTH_UPDATE}}
         try {
-            ${{MODEL_VAR}}->update({{REQUEST_DATA}});
+            $item = $this->service->update(${{MODEL_VAR}}, {{REQUEST_DATA}});
 
             return response()->json([
                 'success' => true,
                 'message' => '{{MODEL_CLASS}} updated successfully.',
-                'data'    => ${{MODEL_VAR}},
+                'data'    => $item,
             ], 200);
         } catch (QueryException $e) {
             return response()->json([
