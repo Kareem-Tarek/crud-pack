@@ -234,7 +234,7 @@
     const restoreBulkUrl = @json($restoreBulkUrl);
     const forceBulkUrl   = @json($forceBulkUrl);
 
-    const selectAll = document.getElementById('selectAllTrashed');
+    let selectAll = document.getElementById('selectAllTrashed'); // changed to let
     let checks = Array.from(document.querySelectorAll('.row-check-trashed'));
     let restoreBtn = document.getElementById('bulkRestoreBtn');
     let forceBtn   = document.getElementById('bulkForceBtn');
@@ -252,11 +252,12 @@
       const ids = selectedIds();
       const anyChecked = ids.length > 0;
 
-      // now points to the CURRENT (cloned) buttons
       if (restoreBtn) restoreBtn.disabled = !anyChecked;
       if (forceBtn) forceBtn.disabled = !anyChecked;
 
       const allChecked = checks.length > 0 && ids.length === checks.length;
+
+      // NOW this updates the REAL checkbox (because selectAll is rebound)
       selectAll.checked = allChecked;
       selectAll.indeterminate = anyChecked && !allChecked;
     }
@@ -264,6 +265,9 @@
     // Remove previous listeners safely by cloning nodes (simple & reliable)
     const selectAllClone = selectAll.cloneNode(true);
     selectAll.parentNode.replaceChild(selectAllClone, selectAll);
+
+    // IMPORTANT: rebind selectAll to the new DOM node
+    selectAll = selectAllClone;
 
     // Clone each row checkbox to wipe any previous listeners
     checks.forEach(c => {
@@ -275,8 +279,8 @@
     checks = Array.from(document.querySelectorAll('.row-check-trashed'));
 
     // Bind listeners using the NEW nodes
-    selectAllClone.addEventListener('change', function () {
-      checks.forEach(c => c.checked = selectAllClone.checked);
+    selectAll.addEventListener('change', function () {
+      checks.forEach(c => c.checked = selectAll.checked);
       syncState();
     });
 
@@ -310,8 +314,6 @@
     if (restoreBtn) {
       const restoreClone = restoreBtn.cloneNode(true);
       restoreBtn.parentNode.replaceChild(restoreClone, restoreBtn);
-
-      // re-bind variable to the NEW button
       restoreBtn = restoreClone;
 
       restoreBtn.addEventListener('click', () =>
@@ -322,8 +324,6 @@
     if (forceBtn) {
       const forceClone = forceBtn.cloneNode(true);
       forceBtn.parentNode.replaceChild(forceClone, forceBtn);
-
-      // re-bind variable to the NEW button
       forceBtn = forceClone;
 
       forceBtn.addEventListener('click', () =>
@@ -345,8 +345,6 @@
   const status = document.getElementById('crudTrashSearchStatus');
 
   if (!input || !wrap) return;
-
-  // If trashSearch route not present, stop here (no errors)
   if (!SEARCH_URL) return;
 
   const initialHtml = wrap.innerHTML;
@@ -381,7 +379,6 @@
 
       const html = await res.text();
 
-      // ignore stale response
       if (input.value.trim() !== queryAtCall) return;
 
       wrap.innerHTML = html;
